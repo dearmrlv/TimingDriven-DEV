@@ -72,6 +72,33 @@ cd install
 
 The iccad2015 contest's official evaluation kit can be found at [Google Drive link](https://drive.google.com/file/d/1BAjEfWxN2dZOtt2-qlgF-qO7D-KHJthX/view?usp=sharing).
 
+## Baseline Reproduction Results
+
+Reproduced on this machine with GPU execution on a single `RTX 4060 Ti (16380 MiB)`.
+
+- Detailed repo map, scripted setup, and reproduction notes: `README.research.md`
+- Machine-readable summaries: `results/baselines/full_suite_template.csv` and `results/baselines/smoke_summary.csv`
+- Reported `TNS` and `WNS` below are the repository's native OpenTimer metrics, not the external ICCAD2015 official evaluator.
+
+| case | method | TNS | WNS | HPWL | runtime | status |
+| --- | --- | --- | --- | --- | --- | --- |
+| superblue1 | DREAMPlace 4.0 | -86.205780 | -14.138051 | 5.764892E+09 | 402.854 | ok |
+| superblue1 | Efficient-TDP | -15.665889 | -8.323147 | 4.188897E+08 | 542.367 | ok |
+| superblue3 | DREAMPlace 4.0 | -50.278965 | -15.729451 | 1.619536E+09 | 502.761 | ok |
+| superblue3 | Efficient-TDP | -19.854089 | -11.724317 | 4.628147E+08 | 554.147 | ok |
+| superblue4 | DREAMPlace 4.0 | -153.626060 | -13.704465 | 1.786124E+09 | 241.609 | ok |
+| superblue4 | Efficient-TDP | -90.259830 | -9.161039 | 3.180224E+08 | 1324.106 | ok |
+| superblue5 | DREAMPlace 4.0 | -101.250460 | -27.685633 | 2.608756E+09 | 454.780 | ok |
+| superblue5 | Efficient-TDP | -65.440080 | -24.220008 | 4.852562E+08 | 748.797 | ok |
+| superblue7 | DREAMPlace 4.0 | -61.622710 | -15.395518 | 8.582195E+08 | 597.971 | ok |
+| superblue7 | Efficient-TDP | -37.190520 | -15.395518 | 5.980916E+08 | 757.736 | ok |
+| superblue10 | DREAMPlace 4.0 | -660.061080 | -23.671605 | 6.766032E+09 | 759.398 | ok |
+| superblue10 | Efficient-TDP | -564.221600 | -23.441709 | 9.145873E+08 | 1866.491 | ok |
+| superblue16 | DREAMPlace 4.0 | -64.993815 | -14.681975 | 1.677648E+09 | 292.204 | ok |
+| superblue16 | Efficient-TDP | -22.604395 | -7.841117 | 4.726394E+08 | 319.362 | ok |
+| superblue18 | DREAMPlace 4.0 | -47.919910 | -11.780133 | 2.065470E+09 | 244.688 | ok |
+| superblue18 | Efficient-TDP | -15.976826 | -6.969738 | 2.338593E+08 | 270.556 | ok |
+
 ## Caution
 
 The default configuration for Critical Path Extraction uses 8 threads to accommodate various CPU cores and RAM capacities, impacting only the execution speed without affecting timing performance. For reproducing the speeds reported in the paper, adjust the thread count to 52 as specified in `DATE25-TDP/thirdparty/OpenTimer/ot/timer/path.cpp` at line 426.
