@@ -27,16 +27,23 @@ add_pytorch_extension(${TARGET_NAME}_cuda
   EXTRA_INCLUDE_DIRS ${INCLUDE_DIRS}
   EXTRA_LINK_LIBRARIES ${LINK_LIBS})
 
+option(DREAMPLACE_BUILD_PIN_POS_SEGMENT "Build optional segmented CUDA pin-pos extension" OFF)
+if(DREAMPLACE_BUILD_PIN_POS_SEGMENT)
 add_pytorch_extension(${TARGET_NAME}_cuda_segment
   src/pin_pos_cuda_segment.cpp
   src/pin_pos_cuda_segment_kernel.cu
   EXTRA_INCLUDE_DIRS ${INCLUDE_DIRS}
   EXTRA_LINK_LIBRARIES ${LINK_LIBS})
+endif()
 
 install(TARGETS 
-  ${TARGET_NAME}_cuda 
+  ${TARGET_NAME}_cuda
+  DESTINATION dreamplace/ops/${OP_NAME})
+if(DREAMPLACE_BUILD_PIN_POS_SEGMENT)
+install(TARGETS 
   ${TARGET_NAME}_cuda_segment
   DESTINATION dreamplace/ops/${OP_NAME})
+endif()
 endif(TORCH_ENABLE_CUDA)
 
 file(GLOB INSTALL_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/*.py)
