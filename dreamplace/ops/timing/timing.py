@@ -6,6 +6,7 @@ import dreamplace.ops.timing.timing_cpp as timing_cpp
 import logging
 import pdb
 
+
 class TimingIO(Function):
     """
     @brief The timer we use will read some external files like celllibs,
@@ -13,6 +14,7 @@ class TimingIO(Function):
      it is called, so the file reading and parsing will be done only once
      exactly after the initialization of placement database.
     """
+
     @staticmethod
     def read(params):
         """
@@ -33,23 +35,36 @@ class TimingIO(Function):
         if "verilog_input" in params.__dict__ and params.verilog_input:
             args += " --verilog_input %s" % (params.verilog_input)
 
-        return timing_cpp.io_forward(args.split(' '))
+        return timing_cpp.io_forward(args.split(" "))
+
 
 class TimingOptFunction(Function):
     @staticmethod
-    def forward(ctx, timer, pos, net_names, pin_names, flat_netpin,
-                netpin_start, pin2node_map, pin_offset_x, pin_offset_y,
-                wire_resistance_per_micron,
-                wire_capacitance_per_micron,
-                scale_factor, lef_unit, def_unit,
-                ignore_net_degree):
+    def forward(
+        ctx,
+        timer,
+        pos,
+        net_names,
+        pin_names,
+        flat_netpin,
+        netpin_start,
+        pin2node_map,
+        pin_offset_x,
+        pin_offset_y,
+        wire_resistance_per_micron,
+        wire_capacitance_per_micron,
+        scale_factor,
+        lef_unit,
+        def_unit,
+        ignore_net_degree,
+    ):
         """
         @brief compute Elmore delay using Flute.
         @param timer the timer used when timing_cpp-driven mode is opened
-        @param pos pin location (x array, y array), not cell location 
+        @param pos pin location (x array, y array), not cell location
         @param net_names the name of each net
         @param pin_names the name of each pin
-        @param flat_netpin flat netpin map, length of #pins 
+        @param flat_netpin flat netpin map, length of #pins
         @param netpin_start starting index in netpin map for each net,
          length of #nets + 1, the last entry is #pins
         @param pin2node the 1d array pin2node map.
@@ -59,7 +74,7 @@ class TimingOptFunction(Function):
         @param wire_capacitance_per_micron unit-length capacitance value
         @param scale_factor the scaling factor to be applied to the design
         @param lef_unit the unit distance microns defined in the LEF file
-        @param def_unit the unit distance microns defined in the DEF file 
+        @param def_unit the unit distance microns defined in the DEF file
         @param ignore_net_degree the degree threshold
         """
         num_pins = netpin_start[-1].item()
@@ -73,7 +88,8 @@ class TimingOptFunction(Function):
             timing_cpp.forward(
                 timer,
                 pos.view(pos.numel()),
-                net_names, pin_names,
+                net_names,
+                pin_names,
                 torch.from_numpy(flat_netpin),
                 torch.from_numpy(netpin_start),
                 torch.from_numpy(pin2node_map),
@@ -81,23 +97,50 @@ class TimingOptFunction(Function):
                 torch.from_numpy(pin_offset_y),
                 wire_resistance_per_micron,
                 wire_capacitance_per_micron,
-                scale_factor, lef_unit, def_unit,
-                ignore_net_degree)
-        return torch.zeros(num_pins);
+                scale_factor,
+                lef_unit,
+                def_unit,
+                ignore_net_degree,
+            )
+        return torch.zeros(num_pins)
+
 
 class TimingOpt(nn.Module):
-    def __init__(self, timer, net_names, pin_names, flat_netpin,
-                 netpin_start, net_name2id_map, pin_name2id_map,
-                 pin2node_map, pin_offset_x, pin_offset_y,
-                 net_criticality, net_criticality_deltas,
-                 net_weights, net_weight_deltas, pin2pin_net_weight,
-                 wire_resistance_per_micron,
-                 wire_capacitance_per_micron,
-                 net_weighting_scheme,
-                 momentum_decay_factor,
-                 scale_factor, lef_unit, def_unit,
-                 ignore_net_degree, 
-                 pin2pin_max_weight, pin2pin_min_weight, pin2pin_accumulate_weight):
+    def __init__(
+        self,
+        timer,
+        net_names,
+        pin_names,
+        flat_netpin,
+        netpin_start,
+        net_name2id_map,
+        pin_name2id_map,
+        pin2node_map,
+        pin_offset_x,
+        pin_offset_y,
+        net_criticality,
+        net_criticality_deltas,
+        net_weights,
+        net_weight_deltas,
+        pin2pin_net_weight,
+        wire_resistance_per_micron,
+        wire_capacitance_per_micron,
+        net_weighting_scheme,
+        momentum_decay_factor,
+        scale_factor,
+        lef_unit,
+        def_unit,
+        ignore_net_degree,
+        pin2pin_max_weight,
+        pin2pin_min_weight,
+        pin2pin_accumulate_weight,
+        pin2pin_net_weighting,
+        enable_dcf,
+        dcf_tau_A,
+        dcf_tau_S,
+        dcf_momentum,
+        dcf_bin_edges,
+    ):
         """
         @brief Initialize the feedback module that inherits from the
          base neural network module in torch framework.
@@ -121,7 +164,7 @@ class TimingOpt(nn.Module):
         @param momentum_decay_factor the decay factor in momentum iteration
         @param scale_factor the scaling factor to be applied to the design
         @param lef_unit the unit distance microns defined in the LEF file
-        @param def_unit the unit distance microns defined in the DEF file 
+        @param def_unit the unit distance microns defined in the DEF file
         @param ignore_net_degree the degree threshold
         """
         super(TimingOpt, self).__init__()
@@ -147,6 +190,20 @@ class TimingOpt(nn.Module):
         self.pin2pin_max_weight = pin2pin_max_weight
         self.pin2pin_min_weight = pin2pin_min_weight
         self.pin2pin_accumulate_weight = pin2pin_accumulate_weight
+        self.pin2pin_net_weighting = pin2pin_net_weighting
+        self.enable_dcf = bool(enable_dcf)
+        self.dcf_tau_A = float(dcf_tau_A)
+        self.dcf_tau_S = float(dcf_tau_S)
+        self.dcf_momentum = float(dcf_momentum)
+
+        if len(dcf_bin_edges) != 3:
+            raise ValueError("dcf_bin_edges must contain exactly three entries")
+        # Convert the user-facing ps bins into the raw OpenTimer unit used by
+        # the timing reports, mirroring the existing WNS/TNS normalization.
+        raw_time_scale = timer.time_unit() * 1e15
+        self.dcf_bin_edges = (
+            np.asarray(dcf_bin_edges, dtype=np.float32) * raw_time_scale
+        )
 
         # The scale factor is important, together with the lef/def unit.
         # Since we require the actual wire-length evaluation (microns) to
@@ -164,63 +221,89 @@ class TimingOpt(nn.Module):
         @pos the tensor determining a sketch placement.
         """
         return TimingOptFunction.apply(
-            self.timer.raw_timer, # Pass the raw object!!
-            pos, # The coordinates
-            self.net_names, self.pin_names,
+            self.timer.raw_timer,  # Pass the raw object!!
+            pos,  # The coordinates
+            self.net_names,
+            self.pin_names,
             self.flat_netpin,
             self.netpin_start,
-            self.pin2node_map, self.pin_offset_x, self.pin_offset_y,
+            self.pin2node_map,
+            self.pin_offset_x,
+            self.pin_offset_y,
             self.wire_resistance_per_micron,
             self.wire_capacitance_per_micron,
-            self.scale_factor, self.lef_unit, self.def_unit,
-            self.ignore_net_degree)
-    
+            self.scale_factor,
+            self.lef_unit,
+            self.def_unit,
+            self.ignore_net_degree,
+        )
+
     def report_timing(self, n=1):
         """
         @brief call the underlying cpp core of report_timing function.
         @param n the maximum number of paths to be reported.
         """
-        return timing_cpp.report_timing(
-            self.timer.raw_timer, n,
-            self.net_name2id_map)
+        return timing_cpp.report_timing(self.timer.raw_timer, n, self.net_name2id_map)
 
     def report_timing_nodes(self, n=1):
         """
         @brief call the underlying cpp core of report_timing function.
         @param n the maximum number of paths to be reported.
         """
-        return timing_cpp.report_timing_nodes(
-            self.timer.raw_timer, n)
+        return timing_cpp.report_timing_nodes(self.timer.raw_timer, n)
 
-    def update_net_weights(self, max_net_weight=np.inf, n=1):
+    def update_net_weights(self, pos, max_net_weight=np.inf, n=1):
         """
         @brief update net weights of placedb
         @param max_net_weight the maximum net weight in timing opt
         @param n the maximum number of paths to be reported.
         """
-        if self.net_weighting_scheme == "adams": scm = 0
-        elif self.net_weighting_scheme == "lilith": scm = 1
-        elif self.net_weighting_scheme == "pin2pin": scm = 2
+        if self.net_weighting_scheme == "adams":
+            scm = 0
+        elif self.net_weighting_scheme == "lilith":
+            scm = 1
+        elif self.net_weighting_scheme == "pin2pin":
+            scm = 2
+        elif self.net_weighting_scheme == "dcf":
+            scm = 3
         else:
-            logging.warning("unsupported net-weighting scheme %r" % \
-                (self.net_weighting_scheme))
-            scm = -1 # Unsupported scheme.
+            logging.warning(
+                "unsupported net-weighting scheme %r" % (self.net_weighting_scheme)
+            )
+            scm = -1  # Unsupported scheme.
+        if self.net_weighting_scheme == "dcf" and not self.pin2pin_net_weighting:
+            logging.warning(
+                "DCF is generating pin-pair weights, but pin2pin_net_weighting is disabled"
+            )
         return timing_cpp.update_net_weights(
-            self.timer.raw_timer, n,
+            self.timer.raw_timer,
+            n,
+            pos.view(pos.numel()),
+            self.pin_names,
             self.net_name2id_map,
             self.pin_name2id_map,
+            torch.from_numpy(self.pin2node_map),
+            torch.from_numpy(self.pin_offset_x),
+            torch.from_numpy(self.pin_offset_y),
             torch.from_numpy(self.net_criticality),
             torch.from_numpy(self.net_criticality_deltas),
             torch.from_numpy(self.net_weights),
             torch.from_numpy(self.net_weight_deltas),
             torch.from_numpy(self.degree_map),
             self.pin2pin_net_weight,
-            scm, # Pass integers instead of strings.
+            self.enable_dcf,
+            self.dcf_tau_A,
+            self.dcf_tau_S,
+            self.dcf_momentum,
+            torch.from_numpy(self.dcf_bin_edges),
+            scm,  # Pass integers instead of strings.
             self.momentum_decay_factor,
-            max_net_weight, # -1 indicates infinity upper bound
+            max_net_weight,  # -1 indicates infinity upper bound
             self.ignore_net_degree,
-            self.pin2pin_max_weight, self.pin2pin_min_weight, self.pin2pin_accumulate_weight
-            )
+            self.pin2pin_max_weight,
+            self.pin2pin_min_weight,
+            self.pin2pin_accumulate_weight,
+        )
 
     def evaluate_slack(self):
         """
@@ -229,8 +312,6 @@ class TimingOpt(nn.Module):
         num_pins = self.pin_names.shape[0]
         slack = np.zeros(num_pins, dtype=np.float32)
         timing_cpp.evaluate_slack(
-            self.timer.raw_timer,
-            self.pin_name2id_map,
-            torch.from_numpy(slack))
+            self.timer.raw_timer, self.pin_name2id_map, torch.from_numpy(slack)
+        )
         return slack
-

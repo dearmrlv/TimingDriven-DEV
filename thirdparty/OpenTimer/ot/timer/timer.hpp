@@ -1,6 +1,8 @@
 #ifndef OT_TIMER_TIMER_HPP_
 #define OT_TIMER_TIMER_HPP_
 
+#include <tuple>
+
 #include <ot/timer/gate.hpp>
 #include <ot/timer/pin.hpp>
 #include <ot/timer/arc.hpp>
@@ -82,6 +84,7 @@ class Timer {
     std::optional<float> report_wns(std::optional<Split> = {}, std::optional<Tran> = {});
     std::optional<size_t> report_fep(std::optional<Split> = {}, std::optional<Tran> = {});
     std::optional<float> report_tns_elw(std::optional<Split> = {});
+    std::vector<std::tuple<std::string, Tran, float>> report_negative_endpoints(Split);
     
     std::vector<Path> report_timing(size_t);
     std::vector<Path> report_timing(size_t, Split);
@@ -542,7 +545,5 @@ inline auto Timer::num_worst_endpoints() {
 };  // end of namespace ot ------------------------------------------------------------------------
 
 #endif
-
-
 
 

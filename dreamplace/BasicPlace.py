@@ -67,7 +67,10 @@ class PlaceDataCollection(object):
             self.node_size_x = torch.from_numpy(placedb.node_size_x).to(device)
             self.node_size_y = torch.from_numpy(placedb.node_size_y).to(device)
 
-            k = 500000
+            # DCF can export a broader set of physical net arcs than the
+            # original path-based pin2pin scheme, so size this buffer from the
+            # pin count instead of a fixed small constant.
+            k = max(500000, int(placedb.pin2node_map.size))
             self.pairs = torch.zeros(2 * k, dtype=torch.int32, device=device)
             self.weights = torch.zeros(k, dtype=torch.float32, device=device)
 
@@ -678,6 +681,12 @@ class BasicPlace(nn.Module):
             pin2pin_max_weight=params.pin2pin_max_weight,
             pin2pin_min_weight=params.pin2pin_min_weight,
             pin2pin_accumulate_weight=params.pin2pin_accumulate_weight,
+            pin2pin_net_weighting=params.pin2pin_net_weighting,
+            enable_dcf=params.enable_dcf,
+            dcf_tau_A=params.dcf_tau_A,
+            dcf_tau_S=params.dcf_tau_S,
+            dcf_momentum=params.dcf_momentum,
+            dcf_bin_edges=params.dcf_bin_edges,
         )
 
     def build_legality_check(self, params, placedb, data_collections, device):

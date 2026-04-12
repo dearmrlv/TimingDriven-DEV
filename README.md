@@ -99,6 +99,21 @@ Reproduced on this machine with GPU execution on a single `RTX 4060 Ti (16380 Mi
 | superblue18 | DREAMPlace 4.0 | -47.919910 | -11.780133 | 2.065470E+09 | 244.688 | ok |
 | superblue18 | Efficient-TDP | -15.976826 | -6.969738 | 2.338593E+08 | 270.556 | ok |
 
+## DCF First Implementation
+
+- Implementation note: `docs/dcf_first_impl.md`
+- Code map: `docs/dcf_code_map.md`
+- DCF configs: `test/iccad2015.dcf/` and `install/test/iccad2015.dcf/`
+- DCF is integrated as a new timing weighting scheme, `net_weighting_scheme: "dcf"`, and reuses the existing pin-to-pin attraction path.
+
+| case | DREAMPlace 4.0 TNS | DREAMPlace 4.0 WNS | DREAMPlace 4.0 HPWL | DREAMPlace 4.0 runtime | Efficient-TDP TNS | Efficient-TDP WNS | Efficient-TDP HPWL | Efficient-TDP runtime | DCF v1 TNS | DCF v1 WNS | DCF v1 HPWL | DCF v1 runtime |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| superblue1 | -86.205780 | -14.138051 | 5.764892E+09 | 402.854 | -15.665889 | -8.323147 | 4.188897E+08 | 542.367 | -48.398495 | -23.075512 | 4.448847E+08 | 317.407 |
+| superblue16 | -64.993815 | -14.681975 | 1.677648E+09 | 292.204 | -22.604395 | -7.841117 | 4.726394E+08 | 319.362 | -99.327000 | -23.684324 | 4.887341E+08 | 231.157 |
+| superblue18 | -47.919910 | -11.780133 | 2.065470E+09 | 244.688 | -16.047550 | -7.073299 | 2.338333E+08 | 262.014 | -17.725619 | -7.188731 | 2.373461E+08 | 226.864 |
+
+All listed DCF runs completed without crash or NaN.
+
 ## Caution
 
 The default configuration for Critical Path Extraction uses 8 threads to accommodate various CPU cores and RAM capacities, impacting only the execution speed without affecting timing performance. For reproducing the speeds reported in the paper, adjust the thread count to 52 as specified in `DATE25-TDP/thirdparty/OpenTimer/ot/timer/path.cpp` at line 426.

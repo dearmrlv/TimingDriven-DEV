@@ -148,6 +148,8 @@ class Pin {
     inline size_t num_fanouts() const;
     inline size_t num_fanins() const;
     inline size_t idx() const;
+    inline const auto& fanins() const;
+    inline const auto& fanouts() const;
 
     inline Pin* net(Net& n) { _net = &n; return this; } // mutator
     inline Pin* gate(Gate& g) { _gate = &g; return this; }
@@ -315,10 +317,17 @@ inline size_t Pin::num_fanouts() const {
   return _fanout.size();
 }
 
+inline const auto& Pin::fanins() const {
+  return _fanin;
+}
+
+inline const auto& Pin::fanouts() const {
+  return _fanout;
+}
+
 };  // end of namespace ot. -----------------------------------------------------------------------
 
 #endif
-
 
 
 

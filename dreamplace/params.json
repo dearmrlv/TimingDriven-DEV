@@ -255,7 +255,7 @@
     "required" : "required for timing-driven mode"
     },
 "net_weighting_scheme" : {
-    "description" : "the net-weighting scheme, adam|lilith",
+    "description" : "the net-weighting scheme, adam|lilith|pin2pin|dcf",
     "default" : "lilith",
     "required" : "required for timing-driven mode"
     },
@@ -329,5 +329,25 @@
 "pin2pin_accumulate_weight": {
     "description": "the added number when adding an extra path",
     "default": 0.2
+    },
+"enable_dcf": {
+    "description": "whether enable DCF timing weighting when scheme is dcf",
+    "default": 0
+    },
+"dcf_tau_A": {
+    "description": "arrival-gap temperature for DCF reverse attribution",
+    "default": 10.0
+    },
+"dcf_tau_S": {
+    "description": "slack-margin temperature for DCF reverse attribution",
+    "default": 10.0
+    },
+"dcf_momentum": {
+    "description": "EMA momentum for DCF pin-pair weights",
+    "default": 0.85
+    },
+"dcf_bin_edges": {
+    "description": "DCF deficit histogram bin edges in ps",
+    "default": [20.0, 50.0, 150.0]
     }
 }

@@ -61,12 +61,22 @@ public:
   ///
   static void update_net_weights(
     ot::Timer& timer, int n,
+    torch::Tensor pos,
+    const std::vector<std::string>& pin_names,
     const _timing_impl::string2index_map_type& net_name2id_map,
     const _timing_impl::string2index_map_type& pin_name2id_map,
+    torch::Tensor pin2node,
+    torch::Tensor pin_offset_x,
+    torch::Tensor pin_offset_y,
     torch::Tensor net_criticality, torch::Tensor net_criticality_deltas,
     torch::Tensor net_weights, torch::Tensor net_weight_deltas,
     torch::Tensor degree_map,
     pybind11::dict& pin2pin_net_weight,
+    bool enable_dcf,
+    double dcf_tau_A,
+    double dcf_tau_S,
+    double dcf_momentum,
+    torch::Tensor dcf_bin_edges,
     int net_weighting_scheme, double momentum_decay_factor,
     double max_net_weight, int ignore_net_degree,
     int pin2pin_max_weight, int pin2pin_min_weight, double pin2pin_accumulate_weight);

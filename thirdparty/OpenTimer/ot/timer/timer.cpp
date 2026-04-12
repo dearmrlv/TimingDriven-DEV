@@ -1383,6 +1383,33 @@ std::optional<size_t> Timer::report_fep(std::optional<Split> el, std::optional<T
   return v;
 }
 
+std::vector<std::tuple<std::string, Tran, float>> Timer::report_negative_endpoints(Split el) {
+
+  std::scoped_lock lock(_mutex);
+
+  _update_endpoints();
+
+  std::vector<std::tuple<std::string, Tran, float>> endpoints;
+
+  FOR_EACH_RF(rf) {
+    for(const auto& ept : _endpoints[el][rf]) {
+      auto slack = ept.slack();
+      if(slack >= 0.0f) {
+        break;
+      }
+
+      if(const auto* test = ept.test(); test) {
+        endpoints.emplace_back(test->constrained_pin().name(), rf, slack);
+      }
+      else if(const auto* po = ept.primary_output(); po) {
+        endpoints.emplace_back(po->_pin.name(), rf, slack);
+      }
+    }
+  }
+
+  return endpoints;
+}
+
 // Function: tns with only the worst between RISE and FALL considered.
 // Update the total negative slack for any timing split.
 std::optional<float> Timer::report_tns_elw(std::optional<Split> el) {
@@ -1954,7 +1981,6 @@ void Timer::_set_diffscale(Pin& pin, float diffscale) {
 
 
 };  // end of namespace ot. -----------------------------------------------------------------------
-
 
 
 

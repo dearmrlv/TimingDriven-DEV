@@ -3,6 +3,10 @@
 #define PYBIND11_DETAILED_ERROR_MESSAGES
 
 #include <memory>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <deque>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -32,7 +36,7 @@ DREAMPLACE_BEGIN_NAMESPACE
 // For different schemes, we implement different algorithms to update net
 // weights in each timing iteration.
 enum class NetWeightingScheme {
-  ADAMS, LILITH, PIN2PIN
+  ADAMS, LILITH, PIN2PIN, DCF
 };
 
 ///
@@ -55,11 +59,16 @@ enum class NetWeightingScheme {
 #define DEFINE_APPLY_SCHEME                                        \
   static void apply(                                               \
       ot::Timer& timer, int n,                                     \
+      const std::vector<std::string>& pin_names,                   \
       const _timing_impl::string2index_map_type& net_name2id_map,  \
       const _timing_impl::string2index_map_type& pin_name2id_map,  \
+      const T* pos, int num_nodes, const int* pin2node_map,        \
+      const T* pin_offset_x, const T* pin_offset_y,                \
       T* net_criticality, T* net_criticality_deltas,               \
       T* net_weights, T* net_weight_deltas, const int* degree_map, \
       pybind11::dict& pin2pin_net_weight,                          \
+      bool enable_dcf, const T* dcf_bin_edges,                     \
+      T dcf_tau_A, T dcf_tau_S, T dcf_momentum,                    \
       T decay, T max_net_weight, int ignore_net_degree,            \
       int num_threads,                                             \
       int pin2pin_max_weight, int pin2pin_min_weight, double pin2pin_accumulate_weight)
@@ -113,6 +122,99 @@ inline float report_net_slack(ot::Timer& timer, const ot::Net& net) {
       slack = std::min(slack, ps);
   }
   return slack;
+}
+
+template <typename T>
+using dcf_hist_type = std::array<T, 4>;
+
+template <typename T>
+inline dcf_hist_type<T> make_zero_dcf_hist() {
+  return {T(0), T(0), T(0), T(0)};
+}
+
+template <typename T>
+inline size_t dcf_state_index(size_t pin_idx, ot::Tran rf, size_t num_pins) {
+  return pin_idx + (rf == ot::FALL ? num_pins : 0);
+}
+
+template <typename T>
+inline int dcf_bin_index(T deficit, const std::array<T, 3>& edges) {
+  if (deficit < edges[0]) return 0;
+  if (deficit < edges[1]) return 1;
+  if (deficit < edges[2]) return 2;
+  return 3;
+}
+
+template <typename T>
+inline T dcf_hist_mass(const dcf_hist_type<T>& hist) {
+  return hist[0] + hist[1] + hist[2] + hist[3];
+}
+
+template <typename T>
+inline void dcf_add_hist(dcf_hist_type<T>& dst, const dcf_hist_type<T>& src) {
+  for (int i = 0; i < 4; ++i) {
+    dst[i] += src[i];
+  }
+}
+
+template <typename T>
+inline dcf_hist_type<T> dcf_scale_hist(const dcf_hist_type<T>& hist, T scale) {
+  dcf_hist_type<T> out = make_zero_dcf_hist<T>();
+  for (int i = 0; i < 4; ++i) {
+    out[i] = hist[i] * scale;
+  }
+  return out;
+}
+
+template <typename T>
+inline T dcf_hist_weighted_sum(
+    const dcf_hist_type<T>& hist,
+    const std::array<T, 4>& representatives) {
+  T sum = 0;
+  for (int i = 0; i < 4; ++i) {
+    sum += hist[i] * representatives[i];
+  }
+  return sum;
+}
+
+template <typename T>
+inline T dcf_safe_exp(T exponent) {
+  return std::exp(std::clamp(exponent, T(-50), T(50)));
+}
+
+template <typename T>
+inline T dcf_pair_length(
+    const T* pos,
+    int num_nodes,
+    const int* pin2node_map,
+    const T* pin_offset_x,
+    const T* pin_offset_y,
+    int pin1,
+    int pin2) {
+  if (!pos) {
+    return T(0);
+  }
+  const T* pos_y = pos + num_nodes;
+  const int node1 = pin2node_map[pin1];
+  const int node2 = pin2node_map[pin2];
+  const T x1 = pos[node1] + pin_offset_x[pin1];
+  const T y1 = pos_y[node1] + pin_offset_y[pin1];
+  const T x2 = pos[node2] + pin_offset_x[pin2];
+  const T y2 = pos_y[node2] + pin_offset_y[pin2];
+  return std::abs(x1 - x2) + std::abs(y1 - y2);
+}
+
+template <typename T>
+inline T dcf_pin_max_arrival(const ot::Pin& pin) {
+  T best = std::numeric_limits<T>::lowest();
+  bool valid = false;
+  for (auto rf : {ot::RISE, ot::FALL}) {
+    if (auto at = pin.at(ot::MAX, rf); at) {
+      best = std::max(best, static_cast<T>(*at));
+      valid = true;
+    }
+  }
+  return valid ? best : T(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -320,6 +422,240 @@ struct NetWeighting<T, NetWeightingScheme::PIN2PIN> {
         dreamplacePrint(kINFO, "all num %i \n", num_all_pairs);
         dreamplacePrint(kINFO, "unique num %i \n", num_unique_pairs);
       }
+};
+
+template <typename T>
+struct NetWeighting<T, NetWeightingScheme::DCF> {
+    DEFINE_APPLY_SCHEME {
+        if (!enable_dcf) {
+            dreamplacePrint(kWARN, "dcf scheme selected but enable_dcf is disabled; skip update\n");
+            return;
+        }
+
+        dreamplacePrint(kINFO, "apply dcf net-weighting scheme...\n");
+        auto begT = std::chrono::steady_clock::now();
+
+        const std::array<T, 3> edges = {
+            dcf_bin_edges[0], dcf_bin_edges[1], dcf_bin_edges[2]};
+        const std::array<T, 4> representatives = {
+            edges[0] * T(0.5),
+            (edges[0] + edges[1]) * T(0.5),
+            (edges[1] + edges[2]) * T(0.5),
+            edges[2]};
+        const T tau_A = std::max(dcf_tau_A, T(1e-3));
+        const T tau_S = std::max(dcf_tau_S, T(1e-3));
+        const T momentum = std::clamp(dcf_momentum, T(0), T(0.999));
+
+        const auto endpoints = timer.report_negative_endpoints(ot::MAX);
+        const size_t num_pins = timer.num_pins();
+        const size_t num_arcs = timer.num_arcs();
+
+        std::vector<dcf_hist_type<T>> node_mass(2 * num_pins, make_zero_dcf_hist<T>());
+        std::vector<dcf_hist_type<T>> arc_hist(num_arcs, make_zero_dcf_hist<T>());
+
+        int failing_endpoints = 0;
+        for (const auto& [pin_name, rf, slack] : endpoints) {
+            const T deficit = std::max(T(0), static_cast<T>(-slack));
+            if (deficit <= 0) {
+                continue;
+            }
+            auto pin_itr = timer.pins().find(pin_name);
+            if (pin_itr == timer.pins().end()) {
+                continue;
+            }
+            const int bin = dcf_bin_index(deficit, edges);
+            auto& hist = node_mass[dcf_state_index<T>(pin_itr->second.idx(), rf, num_pins)];
+            hist[bin] += deficit;
+            ++failing_endpoints;
+        }
+
+        std::vector<int> remaining_fanout(num_pins, 0);
+        std::vector<const ot::Pin*> idx2pin(num_pins, nullptr);
+        std::vector<char> in_order(num_pins, 0);
+        std::deque<const ot::Pin*> ready;
+        for (const auto& [name, pin] : timer.pins()) {
+            remaining_fanout[pin.idx()] = static_cast<int>(pin.num_fanouts());
+            idx2pin[pin.idx()] = &pin;
+            if (pin.num_fanouts() == 0) {
+                ready.push_back(&pin);
+            }
+        }
+
+        std::vector<const ot::Pin*> reverse_order;
+        reverse_order.reserve(num_pins);
+        while (!ready.empty()) {
+            const ot::Pin* pin = ready.front();
+            ready.pop_front();
+            if (in_order[pin->idx()]) {
+                continue;
+            }
+            in_order[pin->idx()] = 1;
+            reverse_order.push_back(pin);
+            for (const ot::Arc* arc : pin->fanins()) {
+                const ot::Pin& pred = arc->from();
+                auto& fanout_left = remaining_fanout[pred.idx()];
+                if (fanout_left > 0 && --fanout_left == 0) {
+                    ready.push_back(&pred);
+                }
+            }
+        }
+
+        if (reverse_order.size() < num_pins) {
+            std::vector<const ot::Pin*> leftovers;
+            leftovers.reserve(num_pins - reverse_order.size());
+            for (size_t idx = 0; idx < num_pins; ++idx) {
+                if (!in_order[idx] && idx2pin[idx]) {
+                    leftovers.push_back(idx2pin[idx]);
+                }
+            }
+            std::sort(leftovers.begin(), leftovers.end(), [](const ot::Pin* lhs, const ot::Pin* rhs) {
+                return dcf_pin_max_arrival<T>(*lhs) > dcf_pin_max_arrival<T>(*rhs);
+            });
+            reverse_order.insert(reverse_order.end(), leftovers.begin(), leftovers.end());
+            dreamplacePrint(kWARN, "dcf encountered %zu pins outside reverse topological order; appended by arrival\n", leftovers.size());
+        }
+
+        for (const ot::Pin* pin : reverse_order) {
+            for (const auto rf : {ot::RISE, ot::FALL}) {
+                auto& q_v = node_mass[dcf_state_index<T>(pin->idx(), rf, num_pins)];
+                if (dcf_hist_mass(q_v) <= 0) {
+                    continue;
+                }
+
+                auto v_at = pin->at(ot::MAX, rf);
+                auto v_rat = pin->rat(ot::MAX, rf);
+                if (!v_at || !v_rat) {
+                    continue;
+                }
+
+                struct Candidate {
+                    const ot::Arc* arc;
+                    ot::Tran pred_rf;
+                    T score;
+                };
+
+                std::vector<Candidate> candidates;
+                T denom = 0;
+                for (const ot::Arc* arc : pin->fanins()) {
+                    const ot::Pin& pred = arc->from();
+                    for (const auto pred_rf : {ot::RISE, ot::FALL}) {
+                        auto pred_at = pred.at(ot::MAX, pred_rf);
+                        auto delay = arc->delay(ot::MAX, pred_rf, rf);
+                        if (!pred_at || !delay) {
+                            continue;
+                        }
+                        const T arrival_gap = static_cast<T>(*v_at) -
+                            (static_cast<T>(*pred_at) + static_cast<T>(*delay));
+                        const T local_margin = static_cast<T>(*v_rat) -
+                            (static_cast<T>(*pred_at) + static_cast<T>(*delay));
+                        const T score = dcf_safe_exp(-arrival_gap / tau_A) *
+                            dcf_safe_exp(-std::max(T(0), local_margin) / tau_S);
+                        if (!std::isfinite(score) || score <= 0) {
+                            continue;
+                        }
+                        candidates.push_back({arc, pred_rf, score});
+                        denom += score;
+                    }
+                }
+
+                if (denom <= 0 || candidates.empty()) {
+                    continue;
+                }
+
+                for (const auto& candidate : candidates) {
+                    const T prob = candidate.score / denom;
+                    const auto delta_q = dcf_scale_hist(q_v, prob);
+                    dcf_add_hist(arc_hist[candidate.arc->idx()], delta_q);
+                    dcf_add_hist(
+                        node_mass[dcf_state_index<T>(candidate.arc->from().idx(), candidate.pred_rf, num_pins)],
+                        delta_q);
+                }
+            }
+        }
+
+        std::unordered_map<std::pair<int, int>, T, pair_hash, pair_equal> previous_weights;
+        for (auto item : pin2pin_net_weight) {
+            auto key = item.first.cast<pybind11::tuple>();
+            previous_weights[{key[0].cast<int>(), key[1].cast<int>()}] = item.second.cast<T>();
+        }
+        pin2pin_net_weight.attr("clear")();
+
+        size_t arcs_with_mass = 0;
+        size_t exported_pairs = 0;
+        T total_weight_mass = 0;
+        std::vector<std::tuple<T, int, int>> top_pairs;
+        top_pairs.reserve(num_arcs);
+
+        for (const auto& arc : timer.arcs()) {
+            const auto& hist = arc_hist[arc.idx()];
+            const T mass = dcf_hist_mass(hist);
+            if (mass <= 0) {
+                continue;
+            }
+            ++arcs_with_mass;
+
+            if (!arc.is_net_arc()) {
+                continue;
+            }
+
+            auto from_itr = pin_name2id_map.find(arc.from().name());
+            auto to_itr = pin_name2id_map.find(arc.to().name());
+            if (from_itr == pin_name2id_map.end() || to_itr == pin_name2id_map.end()) {
+                continue;
+            }
+
+            const int from_pin_id = from_itr->second;
+            const int to_pin_id = to_itr->second;
+            const T severity_mass = dcf_hist_weighted_sum(hist, representatives);
+            const T tail_mass = hist[2] + hist[3];
+            const T utility = severity_mass + T(0.5) * tail_mass;
+            const T eta = dcf_pair_length(
+                pos,
+                num_nodes,
+                pin2node_map,
+                pin_offset_x,
+                pin_offset_y,
+                from_pin_id,
+                to_pin_id);
+            const T mapped_weight = std::log1p(std::max(T(0), utility * eta));
+            if (!std::isfinite(mapped_weight) || mapped_weight <= 0) {
+                continue;
+            }
+
+            T final_weight = mapped_weight;
+            auto old_itr = previous_weights.find({from_pin_id, to_pin_id});
+            if (old_itr != previous_weights.end()) {
+                final_weight = momentum * old_itr->second + (T(1) - momentum) * mapped_weight;
+            }
+
+            if (!std::isfinite(final_weight) || final_weight <= 0) {
+                continue;
+            }
+
+            pin2pin_net_weight[pybind11::make_tuple(from_pin_id, to_pin_id)] = final_weight;
+            ++exported_pairs;
+            total_weight_mass += final_weight;
+            top_pairs.emplace_back(final_weight, from_pin_id, to_pin_id);
+        }
+
+        std::sort(top_pairs.begin(), top_pairs.end(), [](const auto& lhs, const auto& rhs) {
+            return std::get<0>(lhs) > std::get<0>(rhs);
+        });
+
+        auto endT = std::chrono::steady_clock::now();
+        dreamplacePrint(kINFO, "dcf failing endpoints %d\n", failing_endpoints);
+        dreamplacePrint(kINFO, "dcf arcs with nonzero mass %zu\n", arcs_with_mass);
+        dreamplacePrint(kINFO, "dcf exported pin pairs %zu\n", exported_pairs);
+        dreamplacePrint(kINFO, "dcf total exported weight mass %f\n", static_cast<double>(total_weight_mass));
+        for (size_t i = 0; i < std::min<size_t>(5, top_pairs.size()); ++i) {
+            const auto [weight, from_pin_id, to_pin_id] = top_pairs[i];
+            const char* from_name = from_pin_id < static_cast<int>(pin_names.size()) ? pin_names[from_pin_id].c_str() : "<unknown>";
+            const char* to_name = to_pin_id < static_cast<int>(pin_names.size()) ? pin_names[to_pin_id].c_str() : "<unknown>";
+            dreamplacePrint(kINFO, "dcf top pair %zu %s -> %s weight %f\n", i, from_name, to_name, static_cast<double>(weight));
+        }
+        dreamplacePrint(kINFO, "finish dcf net-weighting (%f s)\n",
+            std::chrono::duration_cast<std::chrono::milliseconds>(endT - begT).count() * 0.001);
+    }
 };
 
 #undef DEFINE_APPLY_SCHEME

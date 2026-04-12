@@ -372,21 +372,35 @@ int timingCppLauncher(
 template <typename T>
 void updateNetWeightCppLauncher(
     ot::Timer& timer, int n,
+    const std::vector<std::string>& pin_names,
     const _timing_impl::string2index_map_type& net_name2id_map,
     const _timing_impl::string2index_map_type& pin_name2id_map,
+    const T* pos, int num_nodes,
+    const int* pin2node_map,
+    const T* pin_offset_x,
+    const T* pin_offset_y,
     T* net_criticality, T* net_criticality_deltas,
     T* net_weights, T* net_weight_deltas, const int* degree_map,
     pybind11::dict& pin2pin_net_weight,
+    bool enable_dcf,
+    const T* dcf_bin_edges,
+    T dcf_tau_A,
+    T dcf_tau_S,
+    T dcf_momentum,
     int net_weighting_scheme, T momentum_decay_factor,
     T max_net_weight, int ignore_net_degree, int num_threads, 
     int pin2pin_max_weight, int pin2pin_min_weight, double pin2pin_accumulate_weight) {
 #define SELECT_SCHEME(angel)                         \
   NetWeighting<T, NetWeightingScheme::angel>::apply( \
-      timer, n, net_name2id_map,                     \
+      timer, n, pin_names, net_name2id_map,          \
       pin_name2id_map,                               \
+      pos, num_nodes, pin2node_map,                  \
+      pin_offset_x, pin_offset_y,                    \
       net_criticality, net_criticality_deltas,       \
       net_weights, net_weight_deltas, degree_map,    \
       pin2pin_net_weight,                            \
+      enable_dcf, dcf_bin_edges,                     \
+      dcf_tau_A, dcf_tau_S, dcf_momentum,            \
       momentum_decay_factor, max_net_weight,         \
       ignore_net_degree, num_threads,                \
       pin2pin_max_weight, pin2pin_min_weight, pin2pin_accumulate_weight)
@@ -400,6 +414,10 @@ void updateNetWeightCppLauncher(
       break;
     case 2:
       SELECT_SCHEME(PIN2PIN);
+      break;
+    case 3:
+      SELECT_SCHEME(DCF);
+      break;
     default:
       // WARNING: unsupported net-weighting scheme. Do nothing.
       // Do not report a warning since it has been done in python.
@@ -412,16 +430,34 @@ void updateNetWeightCppLauncher(
 // Implementation of a static class method.
 void TimingCpp::update_net_weights(
     ot::Timer& timer, int n,
+    torch::Tensor pos,
+    const std::vector<std::string>& pin_names,
     const _timing_impl::string2index_map_type& net_name2id_map,
     const _timing_impl::string2index_map_type& pin_name2id_map,
+    torch::Tensor pin2node,
+    torch::Tensor pin_offset_x,
+    torch::Tensor pin_offset_y,
     torch::Tensor net_criticality, torch::Tensor net_criticality_deltas,
     torch::Tensor net_weights, torch::Tensor net_weight_deltas,
     torch::Tensor degree_map,
     pybind11::dict& pin2pin_net_weight,
+    bool enable_dcf,
+    double dcf_tau_A,
+    double dcf_tau_S,
+    double dcf_momentum,
+    torch::Tensor dcf_bin_edges,
     int net_weighting_scheme, double momentum_decay_factor,
     double max_net_weight, int ignore_net_degree,
     int pin2pin_max_weight, int pin2pin_min_weight, double pin2pin_accumulate_weight) {
   // Check torch tensors.
+  CHECK_FLAT_CPU(pos);
+  CHECK_CONTIGUOUS(pos);
+  CHECK_FLAT_CPU(pin2node);
+  CHECK_CONTIGUOUS(pin2node);
+  CHECK_FLAT_CPU(pin_offset_x);
+  CHECK_CONTIGUOUS(pin_offset_x);
+  CHECK_FLAT_CPU(pin_offset_y);
+  CHECK_CONTIGUOUS(pin_offset_y);
   CHECK_FLAT_CPU(net_criticality);
   CHECK_CONTIGUOUS(net_criticality);
   CHECK_FLAT_CPU(net_weights);
@@ -430,19 +466,32 @@ void TimingCpp::update_net_weights(
   CHECK_CONTIGUOUS(net_weight_deltas);
   CHECK_FLAT_CPU(degree_map);
   CHECK_CONTIGUOUS(degree_map);
+  CHECK_FLAT_CPU(dcf_bin_edges);
+  CHECK_CONTIGUOUS(dcf_bin_edges);
 
   DREAMPLACE_DISPATCH_FLOATING_TYPES(
       net_weights, "updateNetWeightCppLauncher",
       [&] {
         updateNetWeightCppLauncher<scalar_t>(
             timer, n,
+            pin_names,
             net_name2id_map, pin_name2id_map,
+            DREAMPLACE_TENSOR_DATA_PTR(pos, scalar_t),
+            pos.numel() / 2,
+            DREAMPLACE_TENSOR_DATA_PTR(pin2node, int),
+            DREAMPLACE_TENSOR_DATA_PTR(pin_offset_x, scalar_t),
+            DREAMPLACE_TENSOR_DATA_PTR(pin_offset_y, scalar_t),
             DREAMPLACE_TENSOR_DATA_PTR(net_criticality, scalar_t),
             DREAMPLACE_TENSOR_DATA_PTR(net_criticality_deltas, scalar_t),
             DREAMPLACE_TENSOR_DATA_PTR(net_weights, scalar_t),
             DREAMPLACE_TENSOR_DATA_PTR(net_weight_deltas, scalar_t),
             DREAMPLACE_TENSOR_DATA_PTR(degree_map, int),
             pin2pin_net_weight,
+            enable_dcf,
+            DREAMPLACE_TENSOR_DATA_PTR(dcf_bin_edges, scalar_t),
+            static_cast<scalar_t>(dcf_tau_A),
+            static_cast<scalar_t>(dcf_tau_S),
+            static_cast<scalar_t>(dcf_momentum),
             net_weighting_scheme,
             static_cast<scalar_t>(momentum_decay_factor),
             static_cast<scalar_t>(max_net_weight),

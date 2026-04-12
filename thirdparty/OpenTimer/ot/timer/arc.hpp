@@ -40,6 +40,7 @@ class Arc {
     size_t idx() const;
 
     TimingView timing_view() const;
+    std::optional<float> delay(Split, Tran, Tran) const;
 
     const Pin& from() const;
     const Pin& to() const;
@@ -88,10 +89,13 @@ inline const Pin& Arc::to() const {
   return _to;
 }
 
+inline std::optional<float> Arc::delay(Split el, Tran frf, Tran trf) const {
+  return _delay[el][frf][trf];
+}
+
 };  // end of namespace ot. -----------------------------------------------------------------------
 
 #endif
-
 
 
 

@@ -9,3 +9,7 @@ install(
 install(
     DIRECTORY iccad2015.pin2pin DESTINATION ${PROJECT_NAME}
     )
+
+install(
+    DIRECTORY iccad2015.dcf DESTINATION ${PROJECT_NAME}
+    )
