@@ -1,0 +1,14 @@
+.venv/
+build/
+logs/
+results/
+__pycache__/
+*.pyc
+benchmarks/iccad2015.ot
+install/bin/
+install/dreamplace/
+install/include/
+install/lib/
+install/test/
+install/thirdparty/
+install/benchmarks/iccad2015.ot

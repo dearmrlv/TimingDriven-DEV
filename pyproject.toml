@@ -1,0 +1,18 @@
+[project]
+name = "efficient-tdp-repro"
+version = "0.0.0"
+description = "Reproducible baseline setup for Efficient-TDP and DREAMPlace 4.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "numpy>=1.26,<2",
+  "scipy>=1.11,<1.14",
+  "matplotlib>=3.8,<4",
+  "cairocffi>=1.6,<2",
+  "shapely>=2,<3",
+  "pkgconfig>=1.5,<2",
+  "pyunpack>=0.3,<1",
+  "patool>=1.12,<3",
+]
+
+[tool.uv]
+package = false
