@@ -35,6 +35,14 @@ The install tree under `install/` is the native runtime location for the compile
   - DREAMPlace 4.0: `install/test/iccad2015.ot/<case>.json`
   - Efficient-TDP: `install/test/iccad2015.pin2pin/<case>.json`
 
+## Canonical Remotes
+
+- `origin`: `git@github.com:dearmrlv/TimingDriven-DEV.git`
+- `ustc`: `git@git.lug.ustc.edu.cn:lvzhengyang/timingdriven-dev.git`
+- `upstream`: `https://github.com/lamda-bbo/Efficient-TDP.git`
+
+Push branch work to `origin` and `ustc`. Treat `upstream` as the original source repository, not the default push target.
+
 ## Benchmark and config locations
 
 - Source benchmark configs live under `test/`
