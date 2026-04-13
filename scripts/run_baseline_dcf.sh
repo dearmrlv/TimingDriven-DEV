@@ -4,10 +4,10 @@ set -euo pipefail
 ROOT_DIR=$(git rev-parse --show-toplevel)
 INSTALL_DIR=${INSTALL_DIR:-"$ROOT_DIR/install"}
 VENV_PYTHON=${VENV_PYTHON:-"$ROOT_DIR/.venv/bin/python"}
-METHOD=efficient_tdp
-CONFIG_SUBDIR=iccad2015.pin2pin
+METHOD=dcf_v1
+CONFIG_SUBDIR=iccad2015.dcf
 DEFAULT_CASES=(superblue1 superblue16 superblue18)
-ALL_CASES=(superblue1 superblue3 superblue4 superblue5 superblue7 superblue10 superblue16 superblue18)
+ALL_CASES=(superblue1 superblue16 superblue18)
 
 if [ ! -x "$VENV_PYTHON" ]; then
   printf 'Expected Python environment at %s. Run scripts/setup_env.sh first.\n' "$VENV_PYTHON" >&2
@@ -98,6 +98,4 @@ PY
     "$VENV_PYTHON" -c 'import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)'
     /usr/bin/time -f 'wall_clock_seconds %e' "$VENV_PYTHON" dreamplace/Placer.py "$runtime_config"
   ) 2>&1 | tee "$log_file"
-
-  "$ROOT_DIR/scripts/run_eval.sh" "$METHOD" "$case_name"
 done

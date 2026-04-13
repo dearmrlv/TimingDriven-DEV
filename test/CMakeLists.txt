@@ -13,3 +13,7 @@ install(
 install(
     DIRECTORY iccad2015.dcf DESTINATION ${PROJECT_NAME}
     )
+
+install(
+    DIRECTORY iccad2015.dcf_v2 DESTINATION ${PROJECT_NAME}
+    )

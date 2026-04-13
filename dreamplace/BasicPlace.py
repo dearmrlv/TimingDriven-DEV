@@ -687,6 +687,12 @@ class BasicPlace(nn.Module):
             dcf_tau_S=params.dcf_tau_S,
             dcf_momentum=params.dcf_momentum,
             dcf_bin_edges=params.dcf_bin_edges,
+            endpoint_grouped_path_k=params.endpoint_grouped_path_k,
+            endpoint_grouped_slack_delta_ps=params.endpoint_grouped_slack_delta_ps,
+            endpoint_repair_tau_ps=params.endpoint_repair_tau_ps,
+            endpoint_repair_alpha=params.endpoint_repair_alpha,
+            endpoint_repair_beta=params.endpoint_repair_beta,
+            endpoint_repair_enable_dump=params.endpoint_repair_enable_dump,
         )
 
     def build_legality_check(self, params, placedb, data_collections, device):

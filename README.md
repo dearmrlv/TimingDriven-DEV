@@ -114,6 +114,19 @@ Reproduced on this machine with GPU execution on a single `RTX 4060 Ti (16380 Mi
 
 All listed DCF runs completed without crash or NaN.
 
+## DCF v2
+
+- Branch line: `dcf-v2`
+- Configs: `test/iccad2015.dcf_v2/` and `install/test/iccad2015.dcf_v2/`
+- `dcf_v2` keeps endpoint-grouped path bundles through endpoint-local repairability scoring, then maps the aggregated pair scores back into the existing pin-to-pin attraction path.
+- The results below were rerun with the same full case configurations used for the README baseline table on `superblue1`, `superblue16`, and `superblue18`.
+
+| case | DREAMPlace 4.0 TNS | DREAMPlace 4.0 WNS | DREAMPlace 4.0 HPWL | DREAMPlace 4.0 runtime | Efficient-TDP TNS | Efficient-TDP WNS | Efficient-TDP HPWL | Efficient-TDP runtime | DCF v1 TNS | DCF v1 WNS | DCF v1 HPWL | DCF v1 runtime | DCF v2 TNS | DCF v2 WNS | DCF v2 HPWL | DCF v2 runtime |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| superblue1 | -86.205780 | -14.138051 | 5.764892E+09 | 402.854 | -15.665889 | -8.323147 | 4.188897E+08 | 542.367 | -48.398495 | -23.075512 | 4.448847E+08 | 317.407 | -102.949960 | -92.096602 | 4.263727E+08 | 530.140 |
+| superblue16 | -64.993815 | -14.681975 | 1.677648E+09 | 292.204 | -22.604395 | -7.841117 | 4.726394E+08 | 319.362 | -99.327000 | -23.684324 | 4.887341E+08 | 231.157 | -1191.347840 | -51.634855 | 1.172121E+09 | 501.645 |
+| superblue18 | -47.919910 | -11.780133 | 2.065470E+09 | 244.688 | -16.047550 | -7.073299 | 2.338333E+08 | 262.014 | -17.725619 | -7.188731 | 2.373461E+08 | 226.864 | -22.634737 | -7.288196 | 2.354371E+08 | 259.487 |
+
 ## Caution
 
 The default configuration for Critical Path Extraction uses 8 threads to accommodate various CPU cores and RAM capacities, impacting only the execution speed without affecting timing performance. For reproducing the speeds reported in the paper, adjust the thread count to 52 as specified in `DATE25-TDP/thirdparty/OpenTimer/ot/timer/path.cpp` at line 426.

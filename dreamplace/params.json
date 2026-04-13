@@ -255,7 +255,7 @@
     "required" : "required for timing-driven mode"
     },
 "net_weighting_scheme" : {
-    "description" : "the net-weighting scheme, adam|lilith|pin2pin|dcf",
+    "description" : "the net-weighting scheme, adam|lilith|pin2pin|dcf|dcf_v2",
     "default" : "lilith",
     "required" : "required for timing-driven mode"
     },
@@ -349,5 +349,29 @@
 "dcf_bin_edges": {
     "description": "DCF deficit histogram bin edges in ps",
     "default": [20.0, 50.0, 150.0]
+    },
+"endpoint_grouped_path_k": {
+    "description": "requested per-endpoint grouped path count for dcf_v2",
+    "default": 1
+    },
+"endpoint_grouped_slack_delta_ps": {
+    "description": "optional slack-delta filter in ps for dcf_v2 grouped paths",
+    "default": 0.0
+    },
+"endpoint_repair_tau_ps": {
+    "description": "path-weight temperature in ps for dcf_v2 endpoint repair scoring",
+    "default": 20.0
+    },
+"endpoint_repair_alpha": {
+    "description": "slack exponent in dcf_v2 endpoint priority",
+    "default": 1.0
+    },
+"endpoint_repair_beta": {
+    "description": "rho1 exponent in dcf_v2 endpoint priority",
+    "default": 1.0
+    },
+"endpoint_repair_enable_dump": {
+    "description": "whether dump dcf_v2 grouped endpoint analysis files",
+    "default": 0
     }
 }

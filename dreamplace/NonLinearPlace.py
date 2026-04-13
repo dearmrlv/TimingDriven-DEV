@@ -27,6 +27,7 @@ import NesterovAcceleratedGradientOptimizer
 import EvalMetrics
 import pdb
 import dreamplace.ops.fence_region.fence_region as fence_region
+import dcf_v2_diagnostics
 
 
 class NonLinearPlace(BasicPlace.BasicPlace):
@@ -52,9 +53,12 @@ class NonLinearPlace(BasicPlace.BasicPlace):
         """
         iteration = 0
         all_metrics = []
+        timing_step_id = [0]
+        dcf_v2_writer = None
         if params.timing_opt_flag or params.timing_eval_flag:
             timing_op = self.op_collections.timing_op
             time_unit = timing_op.timer.time_unit()
+            dcf_v2_writer = dcf_v2_diagnostics.DcfV2AnalysisWriter(params, placedb)
 
         # self.net_weights_ref = placedb.net_weights.copy()
         # self.net_weights_his = placedb.net_weights.copy()
@@ -441,22 +445,26 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                         and iteration > params.start_iter
                         and iteration % 15 == 0
                     ):
-                        # Take the timing operator from the operator collections.
-                        cur_pos = self.pos[0].data.clone().cpu().numpy()
+                        timing_step_id[0] += 1
+                        pos_cpu = self.pos[0].data.clone().cpu()
 
-                        timing_op(self.pos[0].data.clone().cpu())
+                        sta_beg = time.time()
+                        timing_op(pos_cpu)
                         timing_op.timer.update_timing()
+                        sta_time_ms = (time.time() - sta_beg) * 1000.0
                         npaths = max(1, int(placedb.num_nets * 0.03))
 
                         # Report timing step.
                         # Temporary solution: modify net weights
                         beg = time.time()
 
-                        timing_op.update_net_weights(
-                            self.pos[0].data.clone().cpu(),
+                        timing_diag = timing_op.update_net_weights(
+                            pos_cpu,
                             max_net_weight=placedb.max_net_weight,
                             n=npaths,
                         )
+                        if timing_diag is None:
+                            timing_diag = {}
 
                         if self.device != torch.device("cpu"):
                             # Copy weights from placedb.net_weights to device.
@@ -497,6 +505,14 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                             "net-weight update step %.3f ms"
                             % ((time.time() - beg) * 1000)
                         )
+
+                        if dcf_v2_writer.enabled:
+                            dcf_v2_writer.dump_iteration(
+                                timing_step_id=timing_step_id[0],
+                                gp_iter=iteration,
+                                sta_time_ms=sta_time_ms,
+                                timing_diag=timing_diag,
+                            )
 
                         cur_metric.tns = timing_op.timer.report_tns_elw(split=1) / (
                             time_unit * 1e17

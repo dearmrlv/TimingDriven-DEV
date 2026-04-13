@@ -140,6 +140,12 @@ class TimingOpt(nn.Module):
         dcf_tau_S,
         dcf_momentum,
         dcf_bin_edges,
+        endpoint_grouped_path_k,
+        endpoint_grouped_slack_delta_ps,
+        endpoint_repair_tau_ps,
+        endpoint_repair_alpha,
+        endpoint_repair_beta,
+        endpoint_repair_enable_dump,
     ):
         """
         @brief Initialize the feedback module that inherits from the
@@ -195,6 +201,10 @@ class TimingOpt(nn.Module):
         self.dcf_tau_A = float(dcf_tau_A)
         self.dcf_tau_S = float(dcf_tau_S)
         self.dcf_momentum = float(dcf_momentum)
+        self.endpoint_grouped_path_k = int(endpoint_grouped_path_k)
+        self.endpoint_repair_alpha = float(endpoint_repair_alpha)
+        self.endpoint_repair_beta = float(endpoint_repair_beta)
+        self.endpoint_repair_enable_dump = bool(endpoint_repair_enable_dump)
 
         if len(dcf_bin_edges) != 3:
             raise ValueError("dcf_bin_edges must contain exactly three entries")
@@ -204,6 +214,10 @@ class TimingOpt(nn.Module):
         self.dcf_bin_edges = (
             np.asarray(dcf_bin_edges, dtype=np.float32) * raw_time_scale
         )
+        self.endpoint_grouped_slack_delta = (
+            float(endpoint_grouped_slack_delta_ps) * raw_time_scale
+        )
+        self.endpoint_repair_tau = float(endpoint_repair_tau_ps) * raw_time_scale
 
         # The scale factor is important, together with the lef/def unit.
         # Since we require the actual wire-length evaluation (microns) to
@@ -266,14 +280,20 @@ class TimingOpt(nn.Module):
             scm = 2
         elif self.net_weighting_scheme == "dcf":
             scm = 3
+        elif self.net_weighting_scheme == "dcf_v2":
+            scm = 4
         else:
             logging.warning(
                 "unsupported net-weighting scheme %r" % (self.net_weighting_scheme)
             )
             scm = -1  # Unsupported scheme.
-        if self.net_weighting_scheme == "dcf" and not self.pin2pin_net_weighting:
+        if (
+            self.net_weighting_scheme in ["dcf", "dcf_v2"]
+            and not self.pin2pin_net_weighting
+        ):
             logging.warning(
-                "DCF is generating pin-pair weights, but pin2pin_net_weighting is disabled"
+                "%s is generating pin-pair weights, but pin2pin_net_weighting is disabled"
+                % (self.net_weighting_scheme)
             )
         return timing_cpp.update_net_weights(
             self.timer.raw_timer,
@@ -296,6 +316,12 @@ class TimingOpt(nn.Module):
             self.dcf_tau_S,
             self.dcf_momentum,
             torch.from_numpy(self.dcf_bin_edges),
+            self.endpoint_grouped_path_k,
+            self.endpoint_grouped_slack_delta,
+            self.endpoint_repair_tau,
+            self.endpoint_repair_alpha,
+            self.endpoint_repair_beta,
+            self.endpoint_repair_enable_dump,
             scm,  # Pass integers instead of strings.
             self.momentum_decay_factor,
             max_net_weight,  # -1 indicates infinity upper bound
