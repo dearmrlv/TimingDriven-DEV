@@ -102,6 +102,9 @@ class DcfDiagnosticsManager(object):
         self.requested_dump_step_ids = _parse_step_ids(
             getattr(params, "dcf_diag_dump_step_ids", [])
         )
+        self.requested_snapshot_step_ids = _parse_step_ids(
+            getattr(params, "dcf_diag_save_snapshot_step_ids", [])
+        )
         self.stop_after_last_dump_step = bool(
             getattr(params, "dcf_diag_stop_after_last_dump_step", 0)
         )
@@ -121,15 +124,29 @@ class DcfDiagnosticsManager(object):
         )
         self.summary_path = None
         self.scheme_dir = None
+        self.command = " ".join([sys.executable] + sys.argv)
+        self.config_path = None
+        if len(sys.argv) > 1 and str(sys.argv[1]).lower().endswith(".json"):
+            self.config_path = str(Path(sys.argv[1]).resolve())
+        self.git_commit = None
+        self.branch_name = None
         self.pin_names = [_decode_name(name) for name in placedb.pin_names]
         self.num_nodes = int(placedb.num_nodes)
         self.pin2node_map = np.asarray(placedb.pin2node_map, dtype=np.int32)
         self.pin_offset_x = np.asarray(placedb.pin_offset_x)
         self.pin_offset_y = np.asarray(placedb.pin_offset_y)
+        self.snapshot_root_dir = getattr(params, "dcf_diag_replay_snapshot_dir", "")
+        if self.snapshot_root_dir:
+            self.snapshot_root_dir = Path(self.snapshot_root_dir)
+            if not self.snapshot_root_dir.is_absolute():
+                self.snapshot_root_dir = self.snapshot_root_dir.resolve()
+        else:
+            self.snapshot_root_dir = None
         if not self.requested_dump_step_ids and self.dump_first_timing_step_only:
             self.requested_dump_step_ids = [1]
             self.stop_after_last_dump_step = True
         self.requested_dump_step_set = set(self.requested_dump_step_ids)
+        self.requested_snapshot_step_set = set(self.requested_snapshot_step_ids)
         self.last_requested_dump_step = (
             self.requested_dump_step_ids[-1] if self.requested_dump_step_ids else None
         )
@@ -172,17 +189,24 @@ class DcfDiagnosticsManager(object):
 
     def _write_run_artifacts(self, params, dump_root):
         git_root = self._find_git_root(dump_root)
+        self.git_commit = self._run_git(git_root, ["rev-parse", "HEAD"])
+        self.branch_name = self._run_git(
+            git_root, ["rev-parse", "--abbrev-ref", "HEAD"]
+        )
         metadata = {
             "case_name": self.case_name,
             "scheme_name": self.scheme_name,
-            "command": " ".join([sys.executable] + sys.argv),
-            "git_commit": self._run_git(git_root, ["rev-parse", "HEAD"]),
-            "branch_name": self._run_git(
-                git_root, ["rev-parse", "--abbrev-ref", "HEAD"]
-            ),
+            "command": self.command,
+            "config_path": self.config_path,
+            "git_commit": self.git_commit,
+            "branch_name": self.branch_name,
             "diagnostics_dump_dir": str(self.scheme_dir),
             "dump_first_timing_step_only": self.dump_first_timing_step_only,
             "dump_step_ids": self.requested_dump_step_ids,
+            "snapshot_step_ids": self.requested_snapshot_step_ids,
+            "replay_snapshot_dir": str(self.snapshot_root_dir)
+            if self.snapshot_root_dir is not None
+            else None,
             "stop_after_last_dump_step": self.stop_after_last_dump_step,
             "dump_pair_limit": self.dump_pair_limit,
             "dump_state_stats": self.dump_state_stats_enabled,
@@ -198,6 +222,9 @@ class DcfDiagnosticsManager(object):
 
     def should_dump_step(self, timing_step_id):
         return self.enabled and timing_step_id in self.requested_dump_step_set
+
+    def should_save_snapshot_step(self, timing_step_id):
+        return self.enabled and timing_step_id in self.requested_snapshot_step_set
 
     def should_exit_after_step(self, timing_step_id):
         if not self.should_dump_step(timing_step_id):
@@ -286,12 +313,77 @@ class DcfDiagnosticsManager(object):
         step_dir.mkdir(parents=True, exist_ok=True)
         return step_dir
 
-    def dump_pair_rows(self, pos, timing_step_id, gp_iter, pair_dict, timing_diag):
-        if not self.should_dump_step(timing_step_id):
+    def _target_dir(self, timing_step_id=None, output_dir=None):
+        if output_dir is not None:
+            path = Path(output_dir)
+            path.mkdir(parents=True, exist_ok=True)
+            return path
+        if timing_step_id is None:
+            raise ValueError("timing_step_id or output_dir is required")
+        return self._step_dir(timing_step_id)
+
+    def _snapshot_dir(self, timing_step_id):
+        if self.snapshot_root_dir is None:
+            snapshot_dir = self._step_dir(timing_step_id) / "replay_snapshot"
+        else:
+            snapshot_dir = (
+                self.snapshot_root_dir
+                / self.case_name
+                / self.scheme_name
+                / ("step_%03d" % timing_step_id)
+                / "replay_snapshot"
+            )
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        return snapshot_dir
+
+    def write_json(self, output_path, payload):
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w") as fout:
+            json.dump(payload, fout, indent=2, default=_json_default)
+            fout.write("\n")
+        return path
+
+    def write_position_fingerprint(self, output_dir, position_fingerprint):
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        path = output_dir / "position_fingerprint.txt"
+        path.write_text(str(position_fingerprint) + "\n")
+        return path
+
+    def save_replay_snapshot(
+        self, params, timing_step_id, gp_iter, pos, position_fingerprint
+    ):
+        if not self.should_save_snapshot_step(timing_step_id):
             return None
 
-        step_dir = self._step_dir(timing_step_id)
-        csv_path = step_dir / "exported_pairs.csv.gz"
+        snapshot_dir = self._snapshot_dir(timing_step_id)
+        pos_path = snapshot_dir / "pos.pt"
+        torch.save(pos.detach().cpu(), pos_path)
+
+        metadata = {
+            "snapshot_format_version": 1,
+            "case_name": self.case_name,
+            "scheme_name": self.scheme_name,
+            "timing_step_id": int(timing_step_id),
+            "gp_iter": int(gp_iter),
+            "position_fingerprint": position_fingerprint,
+            "command": self.command,
+            "config_path": self.config_path,
+            "source_scheme_dir": str(self.scheme_dir) if self.scheme_dir else None,
+            "git_commit": self.git_commit,
+            "branch_name": self.branch_name,
+        }
+        self.write_json(snapshot_dir / "snapshot_metadata.json", metadata)
+        self.write_json(snapshot_dir / "config_used.json", params.toJson())
+        self.write_position_fingerprint(snapshot_dir, position_fingerprint)
+        return snapshot_dir
+
+    def write_pair_rows(
+        self, output_dir, pos, timing_step_id, gp_iter, pair_dict, timing_diag
+    ):
+        output_dir = self._target_dir(output_dir=output_dir)
+        csv_path = output_dir / "exported_pairs.csv.gz"
         scheme = timing_diag.get("scheme_name") or self.scheme_name
 
         if scheme == "dcf" and timing_diag.get("dcf_pair_src_ids") is not None:
@@ -301,6 +393,92 @@ class DcfDiagnosticsManager(object):
                 csv_path, pos, timing_step_id, gp_iter, pair_dict
             )
         return csv_path
+
+    def write_state_stats(self, output_dir, timing_step_id, timing_diag):
+        if not self.dump_state_stats_enabled:
+            return None
+        state_pin_ids = timing_diag.get("dcf_state_pin_ids")
+        if state_pin_ids is None:
+            return None
+
+        output_dir = self._target_dir(output_dir=output_dir)
+        csv_path = output_dir / "state_stats.csv.gz"
+        pin_ids = state_pin_ids.detach().cpu().numpy()
+        rf = timing_diag["dcf_state_rf"].detach().cpu().numpy()
+        candidate_counts = (
+            timing_diag["dcf_state_candidate_counts"].detach().cpu().numpy()
+        )
+        metrics = timing_diag["dcf_state_metrics"].detach().cpu().numpy()
+
+        headers = [
+            "pin_id",
+            "pin_name",
+            "rf",
+            "node_mass_total",
+            "num_candidate_predecessors",
+            "max_prob",
+            "top1_prob",
+            "top3_prob_sum",
+            "attribution_entropy",
+            "outgoing_mass_total",
+            "incoming_mass_total",
+        ]
+        with gzip.open(csv_path, "wt", newline="") as fout:
+            writer = csv.writer(fout)
+            writer.writerow(headers)
+            for index in range(pin_ids.shape[0]):
+                pin_id = int(pin_ids[index])
+                if pin_id < 0 or pin_id >= len(self.pin_names):
+                    continue
+                writer.writerow(
+                    [
+                        pin_id,
+                        self.pin_names[pin_id],
+                        "fall" if int(rf[index]) else "rise",
+                        float(metrics[index, 0]),
+                        int(candidate_counts[index]),
+                        float(metrics[index, 1]),
+                        float(metrics[index, 2]),
+                        float(metrics[index, 3]),
+                        float(metrics[index, 4]),
+                        float(metrics[index, 5]),
+                        float(metrics[index, 6]),
+                    ]
+                )
+        return csv_path
+
+    def write_utility_summary(self, output_dir, timing_diag):
+        utility_summary = timing_diag.get("dcf_utility_summary")
+        if (
+            utility_summary is None
+            and timing_diag.get("dcf_all_pair_metrics") is not None
+        ):
+            utility_summary = compute_dcf_utility_summary_from_pairs(
+                timing_diag["dcf_all_pair_metrics"].detach().cpu().numpy()
+            )
+        if utility_summary is None:
+            return None
+        output_dir = self._target_dir(output_dir=output_dir)
+        return self.write_json(output_dir / "utility_summary.json", utility_summary)
+
+    def write_objective_term_norms(self, output_dir, snapshot):
+        if not self.dump_term_grad_norms_enabled or snapshot is None:
+            return None
+        output_dir = self._target_dir(output_dir=output_dir)
+        return self.write_json(output_dir / "objective_term_norms.json", snapshot)
+
+    def dump_pair_rows(self, pos, timing_step_id, gp_iter, pair_dict, timing_diag):
+        if not self.should_dump_step(timing_step_id):
+            return None
+
+        return self.write_pair_rows(
+            self._step_dir(timing_step_id),
+            pos,
+            timing_step_id,
+            gp_iter,
+            pair_dict,
+            timing_diag,
+        )
 
     def _dump_pair_rows_from_dict(
         self, csv_path, pos, timing_step_id, gp_iter, pair_dict
@@ -403,89 +581,22 @@ class DcfDiagnosticsManager(object):
     def dump_state_stats(self, timing_step_id, timing_diag):
         if not self.should_dump_step(timing_step_id):
             return None
-        if not self.dump_state_stats_enabled:
-            return None
-        state_pin_ids = timing_diag.get("dcf_state_pin_ids")
-        if state_pin_ids is None:
-            return None
 
-        step_dir = self._step_dir(timing_step_id)
-        csv_path = step_dir / "state_stats.csv.gz"
-        pin_ids = state_pin_ids.detach().cpu().numpy()
-        rf = timing_diag["dcf_state_rf"].detach().cpu().numpy()
-        candidate_counts = (
-            timing_diag["dcf_state_candidate_counts"].detach().cpu().numpy()
+        return self.write_state_stats(
+            self._step_dir(timing_step_id), timing_step_id, timing_diag
         )
-        metrics = timing_diag["dcf_state_metrics"].detach().cpu().numpy()
-
-        headers = [
-            "pin_id",
-            "pin_name",
-            "rf",
-            "node_mass_total",
-            "num_candidate_predecessors",
-            "max_prob",
-            "top1_prob",
-            "top3_prob_sum",
-            "attribution_entropy",
-            "outgoing_mass_total",
-            "incoming_mass_total",
-        ]
-        with gzip.open(csv_path, "wt", newline="") as fout:
-            writer = csv.writer(fout)
-            writer.writerow(headers)
-            for index in range(pin_ids.shape[0]):
-                pin_id = int(pin_ids[index])
-                if pin_id < 0 or pin_id >= len(self.pin_names):
-                    continue
-                writer.writerow(
-                    [
-                        pin_id,
-                        self.pin_names[pin_id],
-                        "fall" if int(rf[index]) else "rise",
-                        float(metrics[index, 0]),
-                        int(candidate_counts[index]),
-                        float(metrics[index, 1]),
-                        float(metrics[index, 2]),
-                        float(metrics[index, 3]),
-                        float(metrics[index, 4]),
-                        float(metrics[index, 5]),
-                        float(metrics[index, 6]),
-                    ]
-                )
-        return csv_path
 
     def dump_utility_summary(self, timing_step_id, timing_diag):
         if not self.should_dump_step(timing_step_id):
             return None
-        utility_summary = timing_diag.get("dcf_utility_summary")
-        if (
-            utility_summary is None
-            and timing_diag.get("dcf_all_pair_metrics") is not None
-        ):
-            utility_summary = compute_dcf_utility_summary_from_pairs(
-                timing_diag["dcf_all_pair_metrics"].detach().cpu().numpy()
-            )
-        if utility_summary is None:
-            return None
-        step_dir = self._step_dir(timing_step_id)
-        json_path = step_dir / "utility_summary.json"
-        with json_path.open("w") as fout:
-            json.dump(utility_summary, fout, indent=2, default=_json_default)
-            fout.write("\n")
-        return json_path
+
+        return self.write_utility_summary(self._step_dir(timing_step_id), timing_diag)
 
     def dump_objective_term_norms(self, timing_step_id, snapshot):
         if not self.should_dump_step(timing_step_id):
             return None
-        if not self.dump_term_grad_norms_enabled or snapshot is None:
-            return None
-        step_dir = self._step_dir(timing_step_id)
-        json_path = step_dir / "objective_term_norms.json"
-        with json_path.open("w") as fout:
-            json.dump(snapshot, fout, indent=2, default=_json_default)
-            fout.write("\n")
-        return json_path
+
+        return self.write_objective_term_norms(self._step_dir(timing_step_id), snapshot)
 
 
 def compute_dcf_utility_summary_from_pairs(pair_metrics):

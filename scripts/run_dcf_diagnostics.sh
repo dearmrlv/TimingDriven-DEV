@@ -47,6 +47,8 @@ RUNTIME_RESULT_DIR="$ROOT_DIR/results/diagnostics_runtime/$CASE_NAME/$SCHEME"
 RUNTIME_CONFIG="$RUN_ROOT/runtime_config.json"
 LOG_DIR="$ROOT_DIR/logs/diagnostics"
 STEP_TAG="${STEP_IDS//,/__}"
+SNAPSHOT_STEP_IDS=${DCF_DIAG_SAVE_SNAPSHOT_STEP_IDS:-}
+REPLAY_SNAPSHOT_DIR=${DCF_DIAG_REPLAY_SNAPSHOT_DIR:-}
 if [ -n "$STEP_TAG" ]; then
   LOG_FILE="$LOG_DIR/${CASE_NAME}.${SCHEME}.${MODE}.${STEP_TAG}.log"
 else
@@ -56,6 +58,7 @@ mkdir -p "$RUN_ROOT" "$RUNTIME_RESULT_DIR" "$LOG_DIR"
 
 "$VENV_PYTHON" - "$SOURCE_CONFIG" "$RUNTIME_CONFIG" "$RUNTIME_RESULT_DIR" "$ROOT_DIR/results/diagnostics" "$CASE_NAME" "$SCHEME" "$MODE" "$STEP_IDS" <<'PY'
 import json
+import os
 import pathlib
 import sys
 
@@ -67,6 +70,8 @@ case_name = sys.argv[5]
 scheme = sys.argv[6]
 mode = sys.argv[7]
 step_ids = sys.argv[8]
+snapshot_step_ids = os.environ.get("DCF_DIAG_SAVE_SNAPSHOT_STEP_IDS", "")
+replay_snapshot_dir = os.environ.get("DCF_DIAG_REPLAY_SNAPSHOT_DIR", "")
 
 with source_path.open() as f:
     data = json.load(f)
@@ -86,6 +91,8 @@ data["dcf_diag_dump_topk"] = 1000
 data["dcf_diag_dump_term_grad_norms"] = 1
 data["dcf_diag_case_tag"] = case_name
 data["dcf_diag_scheme_tag"] = scheme
+data["dcf_diag_save_snapshot_step_ids"] = []
+data["dcf_diag_replay_snapshot_dir"] = replay_snapshot_dir
 
 if mode == "step-list":
     parsed_step_ids = [int(token.strip()) for token in step_ids.split(",") if token.strip()]
@@ -93,6 +100,11 @@ if mode == "step-list":
     data["dcf_diag_stop_after_last_dump_step"] = 1
     step_tag = "_".join(f"{step_id:03d}" for step_id in parsed_step_ids)
     data["dcf_diag_timing_steps_filename"] = f"timing_steps_steps_{step_tag}.jsonl"
+
+if snapshot_step_ids:
+    data["dcf_diag_save_snapshot_step_ids"] = [
+        int(token.strip()) for token in snapshot_step_ids.split(",") if token.strip()
+    ]
 
 runtime_path.parent.mkdir(parents=True, exist_ok=True)
 with runtime_path.open("w") as f:

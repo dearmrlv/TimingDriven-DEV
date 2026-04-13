@@ -366,6 +366,14 @@
     "description": "timing step ids to dump in detail",
     "default": []
     },
+"dcf_diag_save_snapshot_step_ids": {
+    "description": "timing step ids to save replayable placement snapshots for",
+    "default": []
+    },
+"dcf_diag_replay_snapshot_dir": {
+    "description": "optional root directory for replay snapshots; defaults to each step directory",
+    "default": ""
+    },
 "dcf_diag_stop_after_last_dump_step": {
     "description": "stop placement after the last requested detailed dump step",
     "default": 0

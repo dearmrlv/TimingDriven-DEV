@@ -456,6 +456,13 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                             position_fingerprint = diagnostics_mgr.position_fingerprint(
                                 pos_cpu
                             )
+                            diagnostics_mgr.save_replay_snapshot(
+                                params,
+                                timing_step_id,
+                                iteration,
+                                pos_cpu,
+                                position_fingerprint,
+                            )
 
                         timing_update_beg = time.time()
                         timing_op(pos_cpu)
