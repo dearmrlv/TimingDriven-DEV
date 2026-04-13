@@ -12,6 +12,11 @@ from pathlib import Path
 
 import torch
 
+from summarize_dcf_histogram_activity import load_rows as load_hist_rows
+from summarize_dcf_histogram_activity import summarize as summarize_histogram_activity
+from summarize_dcf_state_stats import load_state_stats
+from summarize_dcf_state_stats import summarize_case as summarize_state_stats
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNTIME_ROOT = REPO_ROOT / "install"
@@ -212,7 +217,7 @@ def main() -> None:
         "timing_summary": timing_summary,
     }
 
-    diagnostics_mgr.write_pair_rows(
+    pair_rows_path = diagnostics_mgr.write_pair_rows(
         output_dir,
         pos_cpu,
         timing_step_id,
@@ -220,8 +225,20 @@ def main() -> None:
         placedb.pin2pin_net_weight,
         timing_diag,
     )
-    diagnostics_mgr.write_state_stats(output_dir, timing_step_id, timing_diag)
+    state_stats_path = diagnostics_mgr.write_state_stats(
+        output_dir, timing_step_id, timing_diag
+    )
     diagnostics_mgr.write_utility_summary(output_dir, timing_diag)
+    if args.scheme == "dcf":
+        if state_stats_path is not None:
+            diagnostics_mgr.write_json(
+                output_dir / "state_stats_summary.json",
+                summarize_state_stats(load_state_stats(state_stats_path)),
+            )
+        diagnostics_mgr.write_json(
+            output_dir / "histogram_activity_summary.json",
+            summarize_histogram_activity(load_hist_rows(pair_rows_path)),
+        )
     diagnostics_mgr.write_position_fingerprint(output_dir, position_fingerprint)
     diagnostics_mgr.write_json(output_dir / "replay_metadata.json", replay_metadata)
     diagnostics_mgr.write_json(output_dir / "timing_summary.json", timing_summary)
