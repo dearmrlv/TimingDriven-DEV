@@ -1,0 +1,14 @@
+{
+  "scheme_name": "pin2pin",
+  "timing_step_id": 10,
+  "gp_iter": 645,
+  "npaths": 29997,
+  "position_fingerprint": "d0e8c97d9158e756",
+  "TNS": -426.78144,
+  "WNS": -80.6019765625,
+  "NVP": 92528,
+  "timing_update_total_runtime_sec": 23.011526107788086,
+  "dcf_pass_runtime_sec": null,
+  "arcs_with_nonzero_mass": null,
+  "failing_endpoints_injected": null
+}

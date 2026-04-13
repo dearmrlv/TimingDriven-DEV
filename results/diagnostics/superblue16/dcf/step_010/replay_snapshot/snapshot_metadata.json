@@ -1,0 +1,13 @@
+{
+  "snapshot_format_version": 1,
+  "case_name": "superblue16",
+  "scheme_name": "dcf",
+  "timing_step_id": 10,
+  "gp_iter": 645,
+  "position_fingerprint": "d0e8c97d9158e756",
+  "command": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/.venv/bin/python dreamplace/Placer.py /home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/dcf/runtime_config.json",
+  "config_path": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/dcf/runtime_config.json",
+  "source_scheme_dir": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/dcf",
+  "git_commit": "fa1450026ff5dd651c6c0479cf3f51dcdbb7749f",
+  "branch_name": "diagnostics/dcf-v1-data-dump"
+}

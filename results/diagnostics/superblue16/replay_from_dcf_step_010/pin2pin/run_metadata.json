@@ -1,0 +1,20 @@
+{
+  "case_name": "replay_from_dcf_step_010",
+  "scheme_name": "pin2pin",
+  "command": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/.venv/bin/python scripts/replay_timing_weights.py --snapshot-dir /home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/dcf/step_010/replay_snapshot --scheme pin2pin",
+  "config_path": null,
+  "git_commit": "fa1450026ff5dd651c6c0479cf3f51dcdbb7749f",
+  "branch_name": "diagnostics/dcf-v1-data-dump",
+  "diagnostics_dump_dir": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/replay_from_dcf_step_010/pin2pin",
+  "dump_first_timing_step_only": false,
+  "dump_step_ids": [
+    10
+  ],
+  "snapshot_step_ids": [],
+  "replay_snapshot_dir": null,
+  "stop_after_last_dump_step": true,
+  "dump_pair_limit": 0,
+  "dump_state_stats": false,
+  "dump_term_grad_norms": false,
+  "timing_steps_filename": "timing_steps_replay.jsonl"
+}

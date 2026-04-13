@@ -1,0 +1,14 @@
+{
+  "scheme_name": "dcf",
+  "timing_step_id": 10,
+  "gp_iter": 645,
+  "npaths": 29997,
+  "position_fingerprint": "d0e8c97d9158e756",
+  "TNS": -426.78144,
+  "WNS": -80.6019765625,
+  "NVP": 92528,
+  "timing_update_total_runtime_sec": 15.286153078079224,
+  "dcf_pass_runtime_sec": 3.802,
+  "arcs_with_nonzero_mass": 932431,
+  "failing_endpoints_injected": 32886
+}

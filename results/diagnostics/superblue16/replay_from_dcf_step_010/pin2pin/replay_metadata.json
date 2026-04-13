@@ -1,0 +1,35 @@
+{
+  "source_snapshot_dir": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/dcf/step_010/replay_snapshot",
+  "source_case_name": "superblue16",
+  "source_scheme_name": "dcf",
+  "source_timing_step_id": 10,
+  "source_gp_iter": 645,
+  "replay_scheme_name": "pin2pin",
+  "position_fingerprint": "d0e8c97d9158e756",
+  "snapshot_position_fingerprint": "d0e8c97d9158e756",
+  "max_net_weight": 64.0,
+  "npaths": 29997,
+  "pair_summary": {
+    "exported_pair_count": 213129,
+    "total_exported_weight_mass": 2135210.0814661626,
+    "top1_weight_mass_ratio": 1.4050139731168846e-05,
+    "top5_weight_mass_ratio": 7.025069865584424e-05,
+    "average_exported_pair_length": 839.2791357728146,
+    "median_exported_pair_length": 136.1619873046875,
+    "max_exported_pair_length": 42652.08984375
+  },
+  "timing_summary": {
+    "scheme_name": "pin2pin",
+    "timing_step_id": 10,
+    "gp_iter": 645,
+    "npaths": 29997,
+    "position_fingerprint": "d0e8c97d9158e756",
+    "TNS": -426.78144,
+    "WNS": -80.6019765625,
+    "NVP": 92528,
+    "timing_update_total_runtime_sec": 23.011526107788086,
+    "dcf_pass_runtime_sec": null,
+    "arcs_with_nonzero_mass": null,
+    "failing_endpoints_injected": null
+  }
+}
