@@ -12,9 +12,6 @@ import numpy as np
 import torch
 
 
-DESIGNATED_TIMING_STEP_ID = 1
-
-
 def _json_default(value):
     if isinstance(value, (np.integer,)):
         return int(value)
@@ -75,11 +72,38 @@ def _safe_spearman_from_arrays(lhs, rhs):
     return _safe_corr_from_arrays(_rankdata(lhs), _rankdata(rhs))
 
 
+def _parse_step_ids(raw_value):
+    if raw_value is None:
+        return []
+    if isinstance(raw_value, str):
+        tokens = [token.strip() for token in raw_value.split(",") if token.strip()]
+    elif isinstance(raw_value, (list, tuple, set, np.ndarray)):
+        tokens = list(raw_value)
+    else:
+        tokens = [raw_value]
+
+    step_ids = []
+    for token in tokens:
+        try:
+            step_id = int(token)
+        except (TypeError, ValueError):
+            continue
+        if step_id > 0:
+            step_ids.append(step_id)
+    return sorted(set(step_ids))
+
+
 class DcfDiagnosticsManager(object):
     def __init__(self, params, placedb):
         self.enabled = bool(getattr(params, "enable_dcf_diagnostics", 0))
         self.dump_first_timing_step_only = bool(
             getattr(params, "dcf_diag_dump_first_timing_step_only", 0)
+        )
+        self.requested_dump_step_ids = _parse_step_ids(
+            getattr(params, "dcf_diag_dump_step_ids", [])
+        )
+        self.stop_after_last_dump_step = bool(
+            getattr(params, "dcf_diag_stop_after_last_dump_step", 0)
         )
         self.dump_pair_limit = int(getattr(params, "dcf_diag_dump_pair_limit", 0))
         self.dump_state_stats_enabled = bool(
@@ -102,6 +126,13 @@ class DcfDiagnosticsManager(object):
         self.pin2node_map = np.asarray(placedb.pin2node_map, dtype=np.int32)
         self.pin_offset_x = np.asarray(placedb.pin_offset_x)
         self.pin_offset_y = np.asarray(placedb.pin_offset_y)
+        if not self.requested_dump_step_ids and self.dump_first_timing_step_only:
+            self.requested_dump_step_ids = [1]
+            self.stop_after_last_dump_step = True
+        self.requested_dump_step_set = set(self.requested_dump_step_ids)
+        self.last_requested_dump_step = (
+            self.requested_dump_step_ids[-1] if self.requested_dump_step_ids else None
+        )
 
         if not self.enabled:
             return
@@ -111,7 +142,10 @@ class DcfDiagnosticsManager(object):
             dump_root = dump_root.resolve()
         self.scheme_dir = dump_root / self.case_name / self.scheme_name
         self.scheme_dir.mkdir(parents=True, exist_ok=True)
-        self.summary_path = self.scheme_dir / "timing_steps.jsonl"
+        summary_filename = getattr(
+            params, "dcf_diag_timing_steps_filename", "timing_steps.jsonl"
+        )
+        self.summary_path = self.scheme_dir / summary_filename
         if self.summary_path.exists():
             self.summary_path.unlink()
         self._write_run_artifacts(params, dump_root)
@@ -148,9 +182,12 @@ class DcfDiagnosticsManager(object):
             ),
             "diagnostics_dump_dir": str(self.scheme_dir),
             "dump_first_timing_step_only": self.dump_first_timing_step_only,
+            "dump_step_ids": self.requested_dump_step_ids,
+            "stop_after_last_dump_step": self.stop_after_last_dump_step,
             "dump_pair_limit": self.dump_pair_limit,
             "dump_state_stats": self.dump_state_stats_enabled,
             "dump_term_grad_norms": self.dump_term_grad_norms_enabled,
+            "timing_steps_filename": self.summary_path.name,
         }
         with (self.scheme_dir / "config_used.json").open("w") as fout:
             json.dump(params.toJson(), fout, indent=2, default=_json_default)
@@ -160,11 +197,18 @@ class DcfDiagnosticsManager(object):
             fout.write("\n")
 
     def should_dump_step(self, timing_step_id):
-        return self.enabled and timing_step_id == DESIGNATED_TIMING_STEP_ID
+        return self.enabled and timing_step_id in self.requested_dump_step_set
 
     def should_exit_after_step(self, timing_step_id):
+        if not self.should_dump_step(timing_step_id):
+            return False
+        if self.dump_first_timing_step_only and self.last_requested_dump_step == 1:
+            return True
+        if not self.stop_after_last_dump_step:
+            return False
         return (
-            self.should_dump_step(timing_step_id) and self.dump_first_timing_step_only
+            self.last_requested_dump_step is not None
+            and timing_step_id >= self.last_requested_dump_step
         )
 
     def position_fingerprint(self, pos):

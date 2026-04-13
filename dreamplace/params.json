@@ -362,6 +362,18 @@
     "description": "dump diagnostics at the first timing step and exit early",
     "default": 0
     },
+"dcf_diag_dump_step_ids": {
+    "description": "timing step ids to dump in detail",
+    "default": []
+    },
+"dcf_diag_stop_after_last_dump_step": {
+    "description": "stop placement after the last requested detailed dump step",
+    "default": 0
+    },
+"dcf_diag_timing_steps_filename": {
+    "description": "filename for timing step summary rows",
+    "default": "timing_steps.jsonl"
+    },
 "dcf_diag_dump_pair_limit": {
     "description": "maximum exported pairs to dump per designated timing step, 0 means all",
     "default": 0
