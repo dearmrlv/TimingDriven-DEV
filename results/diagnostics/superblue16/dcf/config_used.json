@@ -102,6 +102,12 @@
   "enable_dcf_diagnostics": 1,
   "dcf_diag_dump_dir": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics",
   "dcf_diag_dump_first_timing_step_only": 0,
+  "dcf_diag_dump_step_ids": [
+    2,
+    10
+  ],
+  "dcf_diag_stop_after_last_dump_step": 1,
+  "dcf_diag_timing_steps_filename": "timing_steps_steps_002_010.jsonl",
   "dcf_diag_dump_pair_limit": 0,
   "dcf_diag_dump_state_stats": 1,
   "dcf_diag_dump_topk": 1000,

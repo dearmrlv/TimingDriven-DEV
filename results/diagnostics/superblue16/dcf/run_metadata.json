@@ -2,11 +2,17 @@
   "case_name": "superblue16",
   "scheme_name": "dcf",
   "command": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/.venv/bin/python dreamplace/Placer.py /home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/dcf/runtime_config.json",
-  "git_commit": "9ae62269add9328a84b17ba8b574be85db9e5a97",
+  "git_commit": "e4ee16f30c3ae7afd2dcc6a1b0575a9459856ac7",
   "branch_name": "diagnostics/dcf-v1-data-dump",
   "diagnostics_dump_dir": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/dcf",
   "dump_first_timing_step_only": false,
+  "dump_step_ids": [
+    2,
+    10
+  ],
+  "stop_after_last_dump_step": true,
   "dump_pair_limit": 0,
   "dump_state_stats": true,
-  "dump_term_grad_norms": true
+  "dump_term_grad_norms": true,
+  "timing_steps_filename": "timing_steps_steps_002_010.jsonl"
 }
