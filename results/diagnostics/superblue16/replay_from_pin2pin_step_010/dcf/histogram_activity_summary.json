@@ -1,0 +1,59 @@
+{
+  "total_pair_count": 142874,
+  "total_hist_mass_per_bin": {
+    "hist_bin0": 279579368.6920926,
+    "hist_bin1": 0.0,
+    "hist_bin2": 0.0,
+    "hist_bin3": 0.0
+  },
+  "hist_mass_fraction_per_bin": {
+    "hist_bin0": 1.0,
+    "hist_bin1": 0.0,
+    "hist_bin2": 0.0,
+    "hist_bin3": 0.0
+  },
+  "pair_fraction_with_nonzero_bin": {
+    "hist_bin0": 1.0,
+    "hist_bin1": 0.0,
+    "hist_bin2": 0.0,
+    "hist_bin3": 0.0
+  },
+  "topk_average_bin_composition": {
+    "100": {
+      "hist_bin0": 1.0,
+      "hist_bin1": 0.0,
+      "hist_bin2": 0.0,
+      "hist_bin3": 0.0
+    },
+    "1000": {
+      "hist_bin0": 1.0,
+      "hist_bin1": 0.0,
+      "hist_bin2": 0.0,
+      "hist_bin3": 0.0
+    },
+    "5000": {
+      "hist_bin0": 1.0,
+      "hist_bin1": 0.0,
+      "hist_bin2": 0.0,
+      "hist_bin3": 0.0
+    }
+  },
+  "T_summary": {
+    "mean": 0.0,
+    "quantiles": {
+      "min": 0.0,
+      "q25": 0.0,
+      "q50": 0.0,
+      "q75": 0.0,
+      "q90": 0.0,
+      "q99": 0.0,
+      "max": 0.0
+    },
+    "fraction_positive": 0.0
+  },
+  "topk_T_fraction_positive": {
+    "100": 0.0,
+    "1000": 0.0,
+    "5000": 0.0
+  }
+}

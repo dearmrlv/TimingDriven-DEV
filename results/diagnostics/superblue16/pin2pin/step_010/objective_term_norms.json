@@ -1,8 +1,8 @@
 {
-  "wirelength_term_value": 431025984.0,
-  "wirelength_grad_norm": 419.43975830078125,
-  "density_term_value": 1428.8240966796875,
-  "density_grad_norm": 329.9339904785156,
-  "pin2pin_term_value": 125995208.0,
-  "pin2pin_grad_norm": 1893.25390625
+  "wirelength_term_value": 431024832.0,
+  "wirelength_grad_norm": 420.1545104980469,
+  "density_term_value": 1404.7938232421875,
+  "density_grad_norm": 324.4167785644531,
+  "pin2pin_term_value": 125559424.0,
+  "pin2pin_grad_norm": 1888.886474609375
 }

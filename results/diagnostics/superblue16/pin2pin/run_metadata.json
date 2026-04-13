@@ -2,17 +2,21 @@
   "case_name": "superblue16",
   "scheme_name": "pin2pin",
   "command": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/.venv/bin/python dreamplace/Placer.py /home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/pin2pin/runtime_config.json",
-  "git_commit": "e4ee16f30c3ae7afd2dcc6a1b0575a9459856ac7",
+  "config_path": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/pin2pin/runtime_config.json",
+  "git_commit": "91849d9d1b02672f4436301ea0b5898e8f28edf5",
   "branch_name": "diagnostics/dcf-v1-data-dump",
   "diagnostics_dump_dir": "/home/lvzhengyang/workspace/TimingDriven/Efficient-TDP/results/diagnostics/superblue16/pin2pin",
   "dump_first_timing_step_only": false,
   "dump_step_ids": [
-    2,
     10
   ],
+  "snapshot_step_ids": [
+    10
+  ],
+  "replay_snapshot_dir": null,
   "stop_after_last_dump_step": true,
   "dump_pair_limit": 0,
   "dump_state_stats": false,
   "dump_term_grad_norms": true,
-  "timing_steps_filename": "timing_steps_steps_002_010.jsonl"
+  "timing_steps_filename": "timing_steps_steps_010.jsonl"
 }
