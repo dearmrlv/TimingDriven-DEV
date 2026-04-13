@@ -57,7 +57,7 @@ enum class NetWeightingScheme {
 /// \param num_threads number of threads for parallel computing.
 ///
 #define DEFINE_APPLY_SCHEME                                        \
-  static void apply(                                               \
+  static pybind11::dict apply(                                     \
       ot::Timer& timer, int n,                                     \
       const std::vector<std::string>& pin_names,                   \
       const _timing_impl::string2index_map_type& net_name2id_map,  \
@@ -69,6 +69,9 @@ enum class NetWeightingScheme {
       pybind11::dict& pin2pin_net_weight,                          \
       bool enable_dcf, const T* dcf_bin_edges,                     \
       T dcf_tau_A, T dcf_tau_S, T dcf_momentum,                    \
+      bool enable_dcf_diagnostics, int diagnostics_step_id,        \
+      bool diagnostics_dump_step, bool dcf_diag_dump_state_stats,  \
+      int dcf_diag_dump_pair_limit, int dcf_diag_dump_topk,        \
       T decay, T max_net_weight, int ignore_net_degree,            \
       int num_threads,                                             \
       int pin2pin_max_weight, int pin2pin_min_weight, double pin2pin_accumulate_weight)
@@ -217,6 +220,44 @@ inline T dcf_pin_max_arrival(const ot::Pin& pin) {
   return valid ? best : T(0);
 }
 
+inline torch::Tensor dcf_tensor_from_int_vector(const std::vector<int>& values) {
+  auto options = torch::TensorOptions().dtype(torch::kInt32);
+  if (values.empty()) {
+    return torch::zeros({0}, options);
+  }
+  return torch::from_blob(
+      const_cast<int*>(values.data()),
+      {static_cast<long>(values.size())},
+      options)
+      .clone();
+}
+
+template <typename T>
+inline torch::Tensor dcf_tensor_from_flat_vector(
+    const std::vector<T>& values,
+    int cols) {
+  auto options = torch::TensorOptions().dtype(
+      std::is_same<T, float>::value ? torch::kFloat32 : torch::kFloat64);
+  if (values.empty()) {
+    if (cols <= 1) {
+      return torch::zeros({0}, options);
+    }
+    return torch::zeros({0, cols}, options);
+  }
+  if (cols <= 1) {
+    return torch::from_blob(
+        const_cast<T*>(values.data()),
+        {static_cast<long>(values.size())},
+        options)
+        .clone();
+  }
+  return torch::from_blob(
+      const_cast<T*>(values.data()),
+      {static_cast<long>(values.size() / cols), cols},
+      options)
+      .clone();
+}
+
 ////////////////////////////////////////////////////////////////////////////
 // Partial specialization of naive net-weighting schemes.
 template <typename T>
@@ -239,7 +280,7 @@ struct NetWeighting<T, NetWeightingScheme::ADAMS> {
     // Check paths returned by timer.
     if (paths.empty()) {
       dreamplacePrint(kWARN, "report_timing: no critical path found\n");
-      return;
+      return pybind11::dict();
     }
     size_t num_nets = timer.num_nets();
     std::vector<bool> net_critical_flag(num_nets, 0);
@@ -263,6 +304,7 @@ struct NetWeighting<T, NetWeightingScheme::ADAMS> {
     dreamplacePrint(kINFO, "finish net-weighting (%f s)\n",
       std::chrono::duration_cast<std::chrono::milliseconds>(
         end - beg).count() * 0.001);
+    return pybind11::dict();
   }
 };
 
@@ -324,6 +366,7 @@ struct NetWeighting<T, NetWeightingScheme::LILITH> {
     dreamplacePrint(kINFO, "finish net-weighting (%f s)\n",
       std::chrono::duration_cast<std::chrono::milliseconds>(
         end - beg).count() * 0.001);
+    return pybind11::dict();
   }
 };
 
@@ -421,19 +464,27 @@ struct NetWeighting<T, NetWeightingScheme::PIN2PIN> {
                 endT - begT).count() * 0.001);
         dreamplacePrint(kINFO, "all num %i \n", num_all_pairs);
         dreamplacePrint(kINFO, "unique num %i \n", num_unique_pairs);
+        return pybind11::dict();
       }
 };
 
 template <typename T>
 struct NetWeighting<T, NetWeightingScheme::DCF> {
     DEFINE_APPLY_SCHEME {
+        pybind11::dict diagnostics;
+        diagnostics["scheme_name"] = pybind11::str("dcf");
+        diagnostics["diagnostics_step_id"] = diagnostics_step_id;
+        diagnostics["dcf_diag_dump_topk"] = dcf_diag_dump_topk;
         if (!enable_dcf) {
             dreamplacePrint(kWARN, "dcf scheme selected but enable_dcf is disabled; skip update\n");
-            return;
+            return diagnostics;
         }
 
         dreamplacePrint(kINFO, "apply dcf net-weighting scheme...\n");
         auto begT = std::chrono::steady_clock::now();
+        const bool collect_heavy = enable_dcf_diagnostics && diagnostics_dump_step;
+        const bool collect_state = collect_heavy && dcf_diag_dump_state_stats;
+        const int pair_limit = std::max(0, dcf_diag_dump_pair_limit);
 
         const std::array<T, 3> edges = {
             dcf_bin_edges[0], dcf_bin_edges[1], dcf_bin_edges[2]};
@@ -515,16 +566,55 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
             dreamplacePrint(kWARN, "dcf encountered %zu pins outside reverse topological order; appended by arrival\n", leftovers.size());
         }
 
+        struct StateRow {
+            int pin_id;
+            int rf;
+            int candidate_count;
+            T node_mass_total;
+            T max_prob;
+            T top1_prob;
+            T top3_prob_sum;
+            T attribution_entropy;
+            T outgoing_mass_total;
+            T incoming_mass_total;
+        };
+        std::vector<StateRow> state_rows;
+        if (collect_state) {
+            state_rows.reserve(num_pins);
+        }
+
         for (const ot::Pin* pin : reverse_order) {
             for (const auto rf : {ot::RISE, ot::FALL}) {
                 auto& q_v = node_mass[dcf_state_index<T>(pin->idx(), rf, num_pins)];
-                if (dcf_hist_mass(q_v) <= 0) {
+                const T incoming_mass = dcf_hist_mass(q_v);
+                if (incoming_mass <= 0) {
                     continue;
+                }
+                int output_pin_id = -1;
+                if (collect_state) {
+                    auto output_pin_itr = pin_name2id_map.find(pin->name());
+                    if (output_pin_itr != pin_name2id_map.end()) {
+                        output_pin_id = output_pin_itr->second;
+                    }
                 }
 
                 auto v_at = pin->at(ot::MAX, rf);
                 auto v_rat = pin->rat(ot::MAX, rf);
                 if (!v_at || !v_rat) {
+                    if (collect_state && output_pin_id >= 0) {
+                        state_rows.push_back({
+                            output_pin_id,
+                            rf == ot::FALL ? 1 : 0,
+                            0,
+                            incoming_mass,
+                            T(0),
+                            T(0),
+                            T(0),
+                            T(0),
+                            T(0),
+                            incoming_mass,
+                        });
+                    }
                     continue;
                 }
 
@@ -559,7 +649,53 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
                 }
 
                 if (denom <= 0 || candidates.empty()) {
+                    if (collect_state && output_pin_id >= 0) {
+                        state_rows.push_back({
+                            output_pin_id,
+                            rf == ot::FALL ? 1 : 0,
+                            0,
+                            incoming_mass,
+                            T(0),
+                            T(0),
+                            T(0),
+                            T(0),
+                            T(0),
+                            incoming_mass,
+                        });
+                    }
                     continue;
+                }
+
+                if (collect_state && output_pin_id >= 0) {
+                    std::vector<T> probs;
+                    probs.reserve(candidates.size());
+                    T max_prob = T(0);
+                    T entropy = T(0);
+                    for (const auto& candidate : candidates) {
+                        const T prob = candidate.score / denom;
+                        probs.push_back(prob);
+                        max_prob = std::max(max_prob, prob);
+                        if (prob > 0) {
+                            entropy -= prob * std::log(prob);
+                        }
+                    }
+                    std::sort(probs.begin(), probs.end(), std::greater<T>());
+                    T top3_prob_sum = T(0);
+                    for (size_t i = 0; i < std::min<size_t>(3, probs.size()); ++i) {
+                        top3_prob_sum += probs[i];
+                    }
+                    state_rows.push_back({
+                        output_pin_id,
+                        rf == ot::FALL ? 1 : 0,
+                        static_cast<int>(candidates.size()),
+                        incoming_mass,
+                        max_prob,
+                        max_prob,
+                        top3_prob_sum,
+                        entropy,
+                        incoming_mass,
+                        incoming_mass,
+                    });
                 }
 
                 for (const auto& candidate : candidates) {
@@ -585,6 +721,16 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
         T total_weight_mass = 0;
         std::vector<std::tuple<T, int, int>> top_pairs;
         top_pairs.reserve(num_arcs);
+        std::vector<int> all_pair_src_ids;
+        std::vector<int> all_pair_dst_ids;
+        std::vector<T> all_pair_hist_flat;
+        std::vector<T> all_pair_metrics_flat;
+        if (collect_heavy) {
+            all_pair_src_ids.reserve(num_arcs);
+            all_pair_dst_ids.reserve(num_arcs);
+            all_pair_hist_flat.reserve(num_arcs * 4);
+            all_pair_metrics_flat.reserve(num_arcs * 7);
+        }
 
         for (const auto& arc : timer.arcs()) {
             const auto& hist = arc_hist[arc.idx()];
@@ -636,6 +782,21 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
             ++exported_pairs;
             total_weight_mass += final_weight;
             top_pairs.emplace_back(final_weight, from_pin_id, to_pin_id);
+
+            if (collect_heavy) {
+                all_pair_src_ids.push_back(from_pin_id);
+                all_pair_dst_ids.push_back(to_pin_id);
+                for (int bin = 0; bin < 4; ++bin) {
+                    all_pair_hist_flat.push_back(hist[bin]);
+                }
+                all_pair_metrics_flat.push_back(mass);
+                all_pair_metrics_flat.push_back(severity_mass);
+                all_pair_metrics_flat.push_back(tail_mass);
+                all_pair_metrics_flat.push_back(utility);
+                all_pair_metrics_flat.push_back(eta);
+                all_pair_metrics_flat.push_back(mapped_weight);
+                all_pair_metrics_flat.push_back(final_weight);
+            }
         }
 
         std::sort(top_pairs.begin(), top_pairs.end(), [](const auto& lhs, const auto& rhs) {
@@ -655,6 +816,79 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
         }
         dreamplacePrint(kINFO, "finish dcf net-weighting (%f s)\n",
             std::chrono::duration_cast<std::chrono::milliseconds>(endT - begT).count() * 0.001);
+        diagnostics["dcf_pass_runtime_sec"] =
+            std::chrono::duration_cast<std::chrono::milliseconds>(endT - begT).count() * 0.001;
+        diagnostics["arcs_with_nonzero_mass"] = pybind11::int_(arcs_with_mass);
+        diagnostics["failing_endpoints_injected"] = pybind11::int_(failing_endpoints);
+
+        if (collect_heavy) {
+            std::vector<size_t> order(all_pair_src_ids.size());
+            for (size_t i = 0; i < order.size(); ++i) {
+                order[i] = i;
+            }
+            std::sort(order.begin(), order.end(), [&](size_t lhs, size_t rhs) {
+                return all_pair_metrics_flat[lhs * 7 + 6] > all_pair_metrics_flat[rhs * 7 + 6];
+            });
+            if (pair_limit > 0 && order.size() > static_cast<size_t>(pair_limit)) {
+                order.resize(pair_limit);
+            }
+
+            std::vector<int> dump_pair_src_ids;
+            std::vector<int> dump_pair_dst_ids;
+            std::vector<T> dump_pair_hist_flat;
+            std::vector<T> dump_pair_metrics_flat;
+            dump_pair_src_ids.reserve(order.size());
+            dump_pair_dst_ids.reserve(order.size());
+            dump_pair_hist_flat.reserve(order.size() * 4);
+            dump_pair_metrics_flat.reserve(order.size() * 7);
+            for (size_t row_id : order) {
+                dump_pair_src_ids.push_back(all_pair_src_ids[row_id]);
+                dump_pair_dst_ids.push_back(all_pair_dst_ids[row_id]);
+                for (int j = 0; j < 4; ++j) {
+                    dump_pair_hist_flat.push_back(all_pair_hist_flat[row_id * 4 + j]);
+                }
+                for (int j = 0; j < 7; ++j) {
+                    dump_pair_metrics_flat.push_back(all_pair_metrics_flat[row_id * 7 + j]);
+                }
+            }
+
+            diagnostics["dcf_pair_src_ids"] = dcf_tensor_from_int_vector(dump_pair_src_ids);
+            diagnostics["dcf_pair_dst_ids"] = dcf_tensor_from_int_vector(dump_pair_dst_ids);
+            diagnostics["dcf_pair_hist"] = dcf_tensor_from_flat_vector(dump_pair_hist_flat, 4);
+            diagnostics["dcf_pair_metrics"] = dcf_tensor_from_flat_vector(dump_pair_metrics_flat, 7);
+            diagnostics["dcf_all_pair_metrics"] = dcf_tensor_from_flat_vector(all_pair_metrics_flat, 7);
+            diagnostics["dcf_exported_pairs_before_limit"] = pybind11::int_(exported_pairs);
+            diagnostics["dcf_dumped_pair_count"] = pybind11::int_(dump_pair_src_ids.size());
+        }
+
+        if (collect_state) {
+            std::vector<int> state_pin_ids;
+            std::vector<int> state_rf_values;
+            std::vector<int> state_candidate_counts;
+            std::vector<T> state_metrics_flat;
+            state_pin_ids.reserve(state_rows.size());
+            state_rf_values.reserve(state_rows.size());
+            state_candidate_counts.reserve(state_rows.size());
+            state_metrics_flat.reserve(state_rows.size() * 7);
+            for (const auto& row : state_rows) {
+                state_pin_ids.push_back(row.pin_id);
+                state_rf_values.push_back(row.rf);
+                state_candidate_counts.push_back(row.candidate_count);
+                state_metrics_flat.push_back(row.node_mass_total);
+                state_metrics_flat.push_back(row.max_prob);
+                state_metrics_flat.push_back(row.top1_prob);
+                state_metrics_flat.push_back(row.top3_prob_sum);
+                state_metrics_flat.push_back(row.attribution_entropy);
+                state_metrics_flat.push_back(row.outgoing_mass_total);
+                state_metrics_flat.push_back(row.incoming_mass_total);
+            }
+            diagnostics["dcf_state_pin_ids"] = dcf_tensor_from_int_vector(state_pin_ids);
+            diagnostics["dcf_state_rf"] = dcf_tensor_from_int_vector(state_rf_values);
+            diagnostics["dcf_state_candidate_counts"] = dcf_tensor_from_int_vector(state_candidate_counts);
+            diagnostics["dcf_state_metrics"] = dcf_tensor_from_flat_vector(state_metrics_flat, 7);
+        }
+
+        return diagnostics;
     }
 };
 

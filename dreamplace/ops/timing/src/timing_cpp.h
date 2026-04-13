@@ -59,7 +59,7 @@ public:
   /// \param max_net_weight maximum net weight in timing opt.
   /// \param num_threads number of threads for parallel computing.
   ///
-  static void update_net_weights(
+  static pybind11::dict update_net_weights(
     ot::Timer& timer, int n,
     torch::Tensor pos,
     const std::vector<std::string>& pin_names,
@@ -77,6 +77,12 @@ public:
     double dcf_tau_S,
     double dcf_momentum,
     torch::Tensor dcf_bin_edges,
+    bool enable_dcf_diagnostics,
+    int diagnostics_step_id,
+    bool diagnostics_dump_step,
+    bool dcf_diag_dump_state_stats,
+    int dcf_diag_dump_pair_limit,
+    int dcf_diag_dump_topk,
     int net_weighting_scheme, double momentum_decay_factor,
     double max_net_weight, int ignore_net_degree,
     int pin2pin_max_weight, int pin2pin_min_weight, double pin2pin_accumulate_weight);

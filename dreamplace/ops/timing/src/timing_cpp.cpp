@@ -370,7 +370,7 @@ int timingCppLauncher(
 /// \param num_threads number of threads for parallel computing.
 ///
 template <typename T>
-void updateNetWeightCppLauncher(
+pybind11::dict updateNetWeightCppLauncher(
     ot::Timer& timer, int n,
     const std::vector<std::string>& pin_names,
     const _timing_impl::string2index_map_type& net_name2id_map,
@@ -387,6 +387,12 @@ void updateNetWeightCppLauncher(
     T dcf_tau_A,
     T dcf_tau_S,
     T dcf_momentum,
+    bool enable_dcf_diagnostics,
+    int diagnostics_step_id,
+    bool diagnostics_dump_step,
+    bool dcf_diag_dump_state_stats,
+    int dcf_diag_dump_pair_limit,
+    int dcf_diag_dump_topk,
     int net_weighting_scheme, T momentum_decay_factor,
     T max_net_weight, int ignore_net_degree, int num_threads, 
     int pin2pin_max_weight, int pin2pin_min_weight, double pin2pin_accumulate_weight) {
@@ -397,38 +403,37 @@ void updateNetWeightCppLauncher(
       pos, num_nodes, pin2node_map,                  \
       pin_offset_x, pin_offset_y,                    \
       net_criticality, net_criticality_deltas,       \
-      net_weights, net_weight_deltas, degree_map,    \
-      pin2pin_net_weight,                            \
-      enable_dcf, dcf_bin_edges,                     \
-      dcf_tau_A, dcf_tau_S, dcf_momentum,            \
-      momentum_decay_factor, max_net_weight,         \
-      ignore_net_degree, num_threads,                \
-      pin2pin_max_weight, pin2pin_min_weight, pin2pin_accumulate_weight)
+       net_weights, net_weight_deltas, degree_map,    \
+       pin2pin_net_weight,                            \
+       enable_dcf, dcf_bin_edges,                     \
+       dcf_tau_A, dcf_tau_S, dcf_momentum,            \
+       enable_dcf_diagnostics, diagnostics_step_id,   \
+       diagnostics_dump_step, dcf_diag_dump_state_stats, \
+       dcf_diag_dump_pair_limit, dcf_diag_dump_topk,  \
+       momentum_decay_factor, max_net_weight,         \
+       ignore_net_degree, num_threads,                \
+       pin2pin_max_weight, pin2pin_min_weight, pin2pin_accumulate_weight)
   // Apply the net-weighting algorithm.
   switch (net_weighting_scheme) {
     case 0:
-      SELECT_SCHEME(ADAMS);
-      break;
+      return SELECT_SCHEME(ADAMS);
     case 1:
-      SELECT_SCHEME(LILITH);
-      break;
+      return SELECT_SCHEME(LILITH);
     case 2:
-      SELECT_SCHEME(PIN2PIN);
-      break;
+      return SELECT_SCHEME(PIN2PIN);
     case 3:
-      SELECT_SCHEME(DCF);
-      break;
+      return SELECT_SCHEME(DCF);
     default:
       // WARNING: unsupported net-weighting scheme. Do nothing.
       // Do not report a warning since it has been done in python.
       // dreamplacePrint(kWARN, "unsupported net-weighting scheme!\n");
-      break;
+      return pybind11::dict();
   }
 #undef SELECT_SCHEME
 }
 
 // Implementation of a static class method.
-void TimingCpp::update_net_weights(
+pybind11::dict TimingCpp::update_net_weights(
     ot::Timer& timer, int n,
     torch::Tensor pos,
     const std::vector<std::string>& pin_names,
@@ -446,6 +451,12 @@ void TimingCpp::update_net_weights(
     double dcf_tau_S,
     double dcf_momentum,
     torch::Tensor dcf_bin_edges,
+    bool enable_dcf_diagnostics,
+    int diagnostics_step_id,
+    bool diagnostics_dump_step,
+    bool dcf_diag_dump_state_stats,
+    int dcf_diag_dump_pair_limit,
+    int dcf_diag_dump_topk,
     int net_weighting_scheme, double momentum_decay_factor,
     double max_net_weight, int ignore_net_degree,
     int pin2pin_max_weight, int pin2pin_min_weight, double pin2pin_accumulate_weight) {
@@ -469,10 +480,11 @@ void TimingCpp::update_net_weights(
   CHECK_FLAT_CPU(dcf_bin_edges);
   CHECK_CONTIGUOUS(dcf_bin_edges);
 
+  pybind11::dict diagnostics;
   DREAMPLACE_DISPATCH_FLOATING_TYPES(
       net_weights, "updateNetWeightCppLauncher",
       [&] {
-        updateNetWeightCppLauncher<scalar_t>(
+        diagnostics = updateNetWeightCppLauncher<scalar_t>(
             timer, n,
             pin_names,
             net_name2id_map, pin_name2id_map,
@@ -492,6 +504,12 @@ void TimingCpp::update_net_weights(
             static_cast<scalar_t>(dcf_tau_A),
             static_cast<scalar_t>(dcf_tau_S),
             static_cast<scalar_t>(dcf_momentum),
+            enable_dcf_diagnostics,
+            diagnostics_step_id,
+            diagnostics_dump_step,
+            dcf_diag_dump_state_stats,
+            dcf_diag_dump_pair_limit,
+            dcf_diag_dump_topk,
             net_weighting_scheme,
             static_cast<scalar_t>(momentum_decay_factor),
             static_cast<scalar_t>(max_net_weight),
@@ -499,6 +517,7 @@ void TimingCpp::update_net_weights(
             at::get_num_threads(),
             pin2pin_max_weight, pin2pin_min_weight, pin2pin_accumulate_weight);
       });
+  return diagnostics;
 }
 
 ///

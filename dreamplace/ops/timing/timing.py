@@ -140,6 +140,11 @@ class TimingOpt(nn.Module):
         dcf_tau_S,
         dcf_momentum,
         dcf_bin_edges,
+        enable_dcf_diagnostics,
+        dcf_diag_dump_first_timing_step_only,
+        dcf_diag_dump_pair_limit,
+        dcf_diag_dump_state_stats,
+        dcf_diag_dump_topk,
     ):
         """
         @brief Initialize the feedback module that inherits from the
@@ -195,6 +200,13 @@ class TimingOpt(nn.Module):
         self.dcf_tau_A = float(dcf_tau_A)
         self.dcf_tau_S = float(dcf_tau_S)
         self.dcf_momentum = float(dcf_momentum)
+        self.enable_dcf_diagnostics = bool(enable_dcf_diagnostics)
+        self.dcf_diag_dump_first_timing_step_only = bool(
+            dcf_diag_dump_first_timing_step_only
+        )
+        self.dcf_diag_dump_pair_limit = int(dcf_diag_dump_pair_limit)
+        self.dcf_diag_dump_state_stats = bool(dcf_diag_dump_state_stats)
+        self.dcf_diag_dump_topk = int(dcf_diag_dump_topk)
 
         if len(dcf_bin_edges) != 3:
             raise ValueError("dcf_bin_edges must contain exactly three entries")
@@ -252,7 +264,14 @@ class TimingOpt(nn.Module):
         """
         return timing_cpp.report_timing_nodes(self.timer.raw_timer, n)
 
-    def update_net_weights(self, pos, max_net_weight=np.inf, n=1):
+    def update_net_weights(
+        self,
+        pos,
+        max_net_weight=np.inf,
+        n=1,
+        diagnostics_step_id=0,
+        diagnostics_dump_step=False,
+    ):
         """
         @brief update net weights of placedb
         @param max_net_weight the maximum net weight in timing opt
@@ -296,6 +315,12 @@ class TimingOpt(nn.Module):
             self.dcf_tau_S,
             self.dcf_momentum,
             torch.from_numpy(self.dcf_bin_edges),
+            self.enable_dcf_diagnostics,
+            diagnostics_step_id,
+            diagnostics_dump_step,
+            self.dcf_diag_dump_state_stats,
+            self.dcf_diag_dump_pair_limit,
+            self.dcf_diag_dump_topk,
             scm,  # Pass integers instead of strings.
             self.momentum_decay_factor,
             max_net_weight,  # -1 indicates infinity upper bound

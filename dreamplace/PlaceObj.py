@@ -511,6 +511,71 @@ class PlaceObj(nn.Module):
 
         return obj, pos.grad
 
+    def compute_objective_term_snapshot(self, pos):
+        with torch.enable_grad():
+            snapshots = {}
+
+            wirelength_term = self.op_collections.wirelength_op(pos)
+            wirelength_grad = autograd.grad(wirelength_term, pos, retain_graph=False)[0]
+            snapshots["wirelength_term_value"] = float(wirelength_term.detach().cpu())
+            snapshots["wirelength_grad_norm"] = float(
+                wirelength_grad.norm(p=2).detach().cpu()
+            )
+
+            if len(self.placedb.regions) > 0:
+                density_raw = self.op_collections.fence_region_density_merged_op(pos)
+                if self.init_density is None:
+                    self.init_density = density_raw.detach().clone()
+                    self.density_weight_grad_precond = self.init_density.masked_scatter(
+                        self.init_density > 0,
+                        1 / self.init_density[self.init_density > 0],
+                    )
+                    self.quad_penalty_coeff = (
+                        self.density_quad_coeff / 2 * self.density_weight_grad_precond
+                    )
+                if self.quad_penalty:
+                    density_raw = density_raw * (
+                        1 + self.quad_penalty_coeff * density_raw
+                    )
+                density_term = self.density_weight.dot(density_raw)
+            else:
+                density_raw = self.op_collections.density_op(pos)
+                if self.init_density is None:
+                    self.init_density = density_raw.detach().clone()
+                    self.density_weight_grad_precond = self.init_density.masked_scatter(
+                        self.init_density > 0,
+                        1 / self.init_density[self.init_density > 0],
+                    )
+                    self.quad_penalty_coeff = (
+                        self.density_quad_coeff / 2 * self.density_weight_grad_precond
+                    )
+                if self.quad_penalty:
+                    density_raw = density_raw * (
+                        1 + self.quad_penalty_coeff * density_raw
+                    )
+                density_term = (
+                    density_raw * (self.density_factor * self.density_weight).item()
+                )
+            density_grad = autograd.grad(density_term, pos, retain_graph=False)[0]
+            snapshots["density_term_value"] = float(density_term.detach().cpu())
+            snapshots["density_grad_norm"] = float(
+                density_grad.norm(p=2).detach().cpu()
+            )
+
+            if self.params.pin2pin_net_weighting:
+                pin2pin_raw = self.op_collections.pin2pin_net_weight_op(pos)
+                pin2pin_term = pin2pin_raw * self.pin2pin_weight
+                pin2pin_grad = autograd.grad(pin2pin_term, pos, retain_graph=False)[0]
+                snapshots["pin2pin_term_value"] = float(pin2pin_term.detach().cpu())
+                snapshots["pin2pin_grad_norm"] = float(
+                    pin2pin_grad.norm(p=2).detach().cpu()
+                )
+            else:
+                snapshots["pin2pin_term_value"] = 0.0
+                snapshots["pin2pin_grad_norm"] = 0.0
+
+        return snapshots
+
     def forward(self):
         """
         @brief Compute objective with current locations of cells.

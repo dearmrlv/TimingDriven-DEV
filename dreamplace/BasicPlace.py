@@ -687,6 +687,11 @@ class BasicPlace(nn.Module):
             dcf_tau_S=params.dcf_tau_S,
             dcf_momentum=params.dcf_momentum,
             dcf_bin_edges=params.dcf_bin_edges,
+            enable_dcf_diagnostics=params.enable_dcf_diagnostics,
+            dcf_diag_dump_first_timing_step_only=params.dcf_diag_dump_first_timing_step_only,
+            dcf_diag_dump_pair_limit=params.dcf_diag_dump_pair_limit,
+            dcf_diag_dump_state_stats=params.dcf_diag_dump_state_stats,
+            dcf_diag_dump_topk=params.dcf_diag_dump_topk,
         )
 
     def build_legality_check(self, params, placedb, data_collections, device):

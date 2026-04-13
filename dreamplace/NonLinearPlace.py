@@ -25,6 +25,7 @@ import BasicPlace
 import PlaceObj
 import NesterovAcceleratedGradientOptimizer
 import EvalMetrics
+import dcf_diagnostics
 import pdb
 import dreamplace.ops.fence_region.fence_region as fence_region
 
@@ -52,6 +53,9 @@ class NonLinearPlace(BasicPlace.BasicPlace):
         """
         iteration = 0
         all_metrics = []
+        diagnostics_mgr = dcf_diagnostics.DcfDiagnosticsManager(params, placedb)
+        timing_step_counter = [0]
+        diagnostics_stop_requested = [False]
         if params.timing_opt_flag or params.timing_eval_flag:
             timing_op = self.op_collections.timing_op
             time_unit = timing_op.timer.time_unit()
@@ -441,22 +445,32 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                         and iteration > params.start_iter
                         and iteration % 15 == 0
                     ):
-                        # Take the timing operator from the operator collections.
-                        cur_pos = self.pos[0].data.clone().cpu().numpy()
+                        timing_step_counter[0] += 1
+                        timing_step_id = timing_step_counter[0]
+                        pos_cpu = self.pos[0].data.clone().cpu()
+                        dump_this_step = diagnostics_mgr.should_dump_step(
+                            timing_step_id
+                        )
+                        position_fingerprint = None
+                        if diagnostics_mgr.enabled:
+                            position_fingerprint = diagnostics_mgr.position_fingerprint(
+                                pos_cpu
+                            )
 
-                        timing_op(self.pos[0].data.clone().cpu())
+                        timing_update_beg = time.time()
+                        timing_op(pos_cpu)
                         timing_op.timer.update_timing()
                         npaths = max(1, int(placedb.num_nets * 0.03))
 
-                        # Report timing step.
-                        # Temporary solution: modify net weights
-                        beg = time.time()
-
-                        timing_op.update_net_weights(
-                            self.pos[0].data.clone().cpu(),
+                        timing_diag = timing_op.update_net_weights(
+                            pos_cpu,
                             max_net_weight=placedb.max_net_weight,
                             n=npaths,
+                            diagnostics_step_id=timing_step_id,
+                            diagnostics_dump_step=dump_this_step,
                         )
+                        if timing_diag is None:
+                            timing_diag = {}
 
                         if self.device != torch.device("cpu"):
                             # Copy weights from placedb.net_weights to device.
@@ -493,9 +507,12 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                                 placedb.pin2pin_net_weight
                             )
 
+                        timing_update_total_runtime_sec = (
+                            time.time() - timing_update_beg
+                        )
                         logging.info(
                             "net-weight update step %.3f ms"
-                            % ((time.time() - beg) * 1000)
+                            % (timing_update_total_runtime_sec * 1000)
                         )
 
                         cur_metric.tns = timing_op.timer.report_tns_elw(split=1) / (
@@ -505,6 +522,82 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                             time_unit * 1e15
                         )
                         cur_metric.nvp = timing_op.timer.raw_timer.report_fep()
+
+                        if diagnostics_mgr.enabled:
+                            pair_summary = diagnostics_mgr.build_pair_summary(
+                                pos_cpu, placedb.pin2pin_net_weight
+                            )
+                            summary_row = {
+                                "case_name": diagnostics_mgr.case_name,
+                                "scheme_name": diagnostics_mgr.scheme_name,
+                                "gp_iter": iteration,
+                                "timing_step_id": timing_step_id,
+                                "start_iter": params.start_iter,
+                                "TNS": float(cur_metric.tns),
+                                "WNS": float(cur_metric.wns),
+                                "NVP": int(cur_metric.nvp)
+                                if cur_metric.nvp is not None
+                                else None,
+                                "exported_pair_count": pair_summary[
+                                    "exported_pair_count"
+                                ],
+                                "total_exported_weight_mass": pair_summary[
+                                    "total_exported_weight_mass"
+                                ],
+                                "top1_weight_mass_ratio": pair_summary[
+                                    "top1_weight_mass_ratio"
+                                ],
+                                "top5_weight_mass_ratio": pair_summary[
+                                    "top5_weight_mass_ratio"
+                                ],
+                                "average_exported_pair_length": pair_summary[
+                                    "average_exported_pair_length"
+                                ],
+                                "median_exported_pair_length": pair_summary[
+                                    "median_exported_pair_length"
+                                ],
+                                "max_exported_pair_length": pair_summary[
+                                    "max_exported_pair_length"
+                                ],
+                                "timing_update_total_runtime_sec": timing_update_total_runtime_sec,
+                                "dcf_pass_runtime_sec": timing_diag.get(
+                                    "dcf_pass_runtime_sec"
+                                ),
+                                "arcs_with_nonzero_mass": timing_diag.get(
+                                    "arcs_with_nonzero_mass"
+                                ),
+                                "failing_endpoints_injected": timing_diag.get(
+                                    "failing_endpoints_injected"
+                                ),
+                                "position_fingerprint": position_fingerprint,
+                            }
+                            diagnostics_mgr.append_timing_step_summary(summary_row)
+                            if dump_this_step:
+                                diagnostics_mgr.dump_pair_rows(
+                                    pos_cpu,
+                                    timing_step_id,
+                                    iteration,
+                                    placedb.pin2pin_net_weight,
+                                    timing_diag,
+                                )
+                                diagnostics_mgr.dump_state_stats(
+                                    timing_step_id, timing_diag
+                                )
+                                diagnostics_mgr.dump_utility_summary(
+                                    timing_step_id, timing_diag
+                                )
+                                term_snapshot = None
+                                if diagnostics_mgr.dump_term_grad_norms_enabled:
+                                    term_snapshot = (
+                                        model.compute_objective_term_snapshot(pos)
+                                    )
+                                diagnostics_mgr.dump_objective_term_norms(
+                                    timing_step_id, term_snapshot
+                                )
+                                if diagnostics_mgr.should_exit_after_step(
+                                    timing_step_id
+                                ):
+                                    diagnostics_stop_requested[0] = True
 
                     # nesterov has already computed the objective of the next step
                     if optimizer_name.lower() == "nesterov":
@@ -700,6 +793,8 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                                 to_plot_pins,
                                 pin_ids,
                             )
+                            if diagnostics_stop_requested[0]:
+                                stop_placement = 2
 
                             if len(placedb.regions) == 0:
                                 overflow_list.append(
@@ -908,7 +1003,7 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                         )
                     if (
                         Lgamma_stop_criterion(Lgamma_step, Lgamma_metrics)
-                        or stop_placement == 1
+                        or stop_placement != 0
                     ):
                         break
 
@@ -991,6 +1086,9 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                     "optimizer %s takes %.3f seconds"
                     % (optimizer_name, time.time() - tt)
                 )
+
+                if diagnostics_stop_requested[0]:
+                    return all_metrics
 
             # recover node size and pin offset for legalization, since node size is adjusted in global placement
             if params.routability_opt_flag:
