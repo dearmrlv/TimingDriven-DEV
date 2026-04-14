@@ -15,5 +15,9 @@ install(
     )
 
 install(
+    DIRECTORY iccad2015.dcfv3 DESTINATION ${PROJECT_NAME}
+    )
+
+install(
     DIRECTORY iccad2015.diagnostics DESTINATION ${PROJECT_NAME}
     )
