@@ -27,9 +27,14 @@ def last_match(pattern: str, text: str) -> str | None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--method", required=True)
+    parser.add_argument("--method-key", default="")
+    parser.add_argument("--variant", default="")
+    parser.add_argument("--beta", default="")
     parser.add_argument("--case", required=True)
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--log", required=True)
+    parser.add_argument("--output-tag", default="")
+    parser.add_argument("--run-label", default="")
     parser.add_argument("--output", default="")
     args = parser.parse_args()
 
@@ -46,6 +51,11 @@ def main() -> None:
     payload = {
         "case": args.case,
         "method": args.method,
+        "method_key": args.method_key,
+        "variant": args.variant,
+        "beta": args.beta,
+        "output_tag": args.output_tag,
+        "run_label": args.run_label,
         "tns": last_match(r"TNS\s+([-0-9.]+)\s+\(1e\+5 ps\)", log_text) or "",
         "wns": last_match(r"WNS\s+([-0-9.]+)\s+\(1e\+3 ps\)", log_text) or "",
         "hpwl": last_match(r"wHPWL\s+([0-9.E+-]+)", log_text) or "",

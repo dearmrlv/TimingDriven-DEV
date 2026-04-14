@@ -3,9 +3,35 @@ set -euo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 INSTALL_DIR=${INSTALL_DIR:-"$ROOT_DIR/install"}
+CONFIG_ROOT=${CONFIG_ROOT:-"$ROOT_DIR/test"}
 VENV_PYTHON=${VENV_PYTHON:-"$ROOT_DIR/.venv/bin/python"}
+OUTPUT_TAG=${OUTPUT_TAG:-"dcf_v3"}
+RUN_LABEL=${RUN_LABEL:-""}
 DEFAULT_CASES=(superblue18 superblue16)
-VARIANTS=(v1 v3a v3b v3c)
+METHOD_KEYS=${METHOD_KEYS:-"dcf_v1,dcf_v3b,dcf_v3c_b005,dcf_v3c_b010,dcf_v3c_b015,dcf_v3c_b020,dcf_v3c_b025"}
+METHOD_SPECS=(
+  "dcf_v1|DCF v1|v1||iccad2015.dcf|{case}.json"
+  "dcf_v3a|DCF v3a|v3a||iccad2015.dcfv3|{case}.v3a.json"
+  "dcf_v3b|DCF v3b|v3b||iccad2015.dcfv3|{case}.v3b.json"
+  "dcf_v3c|DCF v3c|v3c|0.25|iccad2015.dcfv3|{case}.v3c.json"
+  "dcf_v3c_b005|DCF v3c|v3c|0.05|iccad2015.dcfv3|{case}.v3c.b005.json"
+  "dcf_v3c_b010|DCF v3c|v3c|0.10|iccad2015.dcfv3|{case}.v3c.b010.json"
+  "dcf_v3c_b015|DCF v3c|v3c|0.15|iccad2015.dcfv3|{case}.v3c.b015.json"
+  "dcf_v3c_b020|DCF v3c|v3c|0.20|iccad2015.dcfv3|{case}.v3c.b020.json"
+  "dcf_v3c_b025|DCF v3c|v3c|0.25|iccad2015.dcfv3|{case}.v3c.b025.json"
+)
+
+method_selected() {
+  local method_key="$1"
+  case ",${METHOD_KEYS}," in
+    *,"${method_key}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
 
 if [ ! -x "$VENV_PYTHON" ]; then
   printf 'Expected Python environment at %s. Run scripts/setup_env.sh first.\n' "$VENV_PYTHON" >&2
@@ -30,27 +56,30 @@ else
 fi
 
 git_commit=$(git rev-parse HEAD)
+result_root="$ROOT_DIR/results/$OUTPUT_TAG"
+log_root="$ROOT_DIR/logs/$OUTPUT_TAG"
 
 for case_name in "${cases[@]}"; do
-  for variant in "${VARIANTS[@]}"; do
-    method_key="dcf_${variant}"
-    method_label="DCF ${variant}"
-    config_subdir="iccad2015.dcf"
-    config_name="${case_name}.json"
-    if [ "$variant" != "v1" ]; then
-      config_subdir="iccad2015.dcfv3"
-      config_name="${case_name}.${variant}.json"
+  for spec in "${METHOD_SPECS[@]}"; do
+    IFS='|' read -r method_key method_label variant beta config_subdir config_template <<< "$spec"
+    if ! method_selected "$method_key"; then
+      continue
     fi
 
-    source_config="$INSTALL_DIR/test/$config_subdir/$config_name"
-    run_dir="$ROOT_DIR/results/dcf_v3/$method_key/$case_name"
-    method_result_dir="$ROOT_DIR/results/dcf_v3/$method_key"
+    config_name="${config_template//\{case\}/$case_name}"
+
+    source_config="$CONFIG_ROOT/$config_subdir/$config_name"
+    run_dir="$result_root/$method_key/$case_name"
+    method_result_dir="$result_root/$method_key"
     runtime_config="$run_dir/config.json"
-    log_dir="$ROOT_DIR/logs/dcf_v3/$method_key"
+    log_dir="$log_root/$method_key"
     log_file="$log_dir/${case_name}.log"
+    if [ -n "$RUN_LABEL" ]; then
+      log_file="$log_dir/${case_name}.${RUN_LABEL}.log"
+    fi
     command_file="$run_dir/command.txt"
     git_file="$run_dir/git_commit.txt"
-    diagnostics_root="$ROOT_DIR/results/dcf_v3/diagnostics"
+    diagnostics_root="$result_root/diagnostics"
 
     if [ ! -f "$source_config" ]; then
       printf 'Missing config %s\n' "$source_config" >&2
@@ -59,7 +88,7 @@ for case_name in "${cases[@]}"; do
 
     mkdir -p "$run_dir" "$log_dir"
 
-    "$VENV_PYTHON" - "$source_config" "$runtime_config" "$method_result_dir" "$diagnostics_root" "$method_key" <<'PY'
+    "$VENV_PYTHON" - "$source_config" "$runtime_config" "$method_result_dir" "$diagnostics_root" "$method_key" "$RUN_LABEL" <<'PY'
 import json
 import pathlib
 import sys
@@ -69,6 +98,7 @@ runtime_path = pathlib.Path(sys.argv[2])
 result_dir = pathlib.Path(sys.argv[3]).resolve()
 diagnostics_root = pathlib.Path(sys.argv[4]).resolve()
 method_key = sys.argv[5]
+run_label = sys.argv[6]
 
 with source_path.open() as f:
     data = json.load(f)
@@ -88,7 +118,7 @@ data["dcf_diag_dump_pair_limit"] = 0
 data["dcf_diag_dump_state_stats"] = 0
 data["dcf_diag_dump_topk"] = 1000
 data["dcf_diag_dump_term_grad_norms"] = 0
-data["dcf_diag_scheme_tag"] = method_key
+data["dcf_diag_scheme_tag"] = method_key if not run_label else f"{method_key}_{run_label}"
 
 runtime_path.parent.mkdir(parents=True, exist_ok=True)
 with runtime_path.open("w") as f:
@@ -107,9 +137,14 @@ PY
 
     "$VENV_PYTHON" "$ROOT_DIR/scripts/collect_experiment_metrics.py" \
       --method "$method_label" \
+      --method-key "$method_key" \
+      --variant "$variant" \
+      --beta "$beta" \
       --case "$case_name" \
       --run-dir "$run_dir" \
       --log "$log_file" \
+      --output-tag "$OUTPUT_TAG" \
+      --run-label "$RUN_LABEL" \
       --output "$run_dir/metrics.json"
   done
 done
