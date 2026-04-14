@@ -69,6 +69,7 @@ enum class NetWeightingScheme {
       pybind11::dict& pin2pin_net_weight,                          \
       bool enable_dcf, const T* dcf_bin_edges,                     \
       T dcf_tau_A, T dcf_tau_S, T dcf_momentum,                    \
+      int dcf_version, T dcf_beta,                                 \
       bool enable_dcf_diagnostics, int diagnostics_step_id,        \
       bool diagnostics_dump_step, bool dcf_diag_dump_state_stats,  \
       int dcf_diag_dump_pair_limit, int dcf_diag_dump_topk,        \
@@ -218,6 +219,35 @@ inline T dcf_pin_max_arrival(const ot::Pin& pin) {
     }
   }
   return valid ? best : T(0);
+}
+
+template <typename T>
+inline T dcf_export_utility(
+    int dcf_version,
+    T severity_mass,
+    T tail_mass,
+    T total_mass,
+    T dcf_beta) {
+  switch (dcf_version) {
+    case 1:
+      return severity_mass + T(0.5) * tail_mass;
+    case 2:
+      return total_mass;
+    case 3:
+      return total_mass + dcf_beta * tail_mass;
+    case 0:
+    default:
+      return severity_mass + T(0.5) * tail_mass;
+  }
+}
+
+template <typename T>
+inline T dcf_map_export_weight(int dcf_version, T utility, T eta) {
+  const T clamped_utility = std::max(T(0), utility);
+  if (dcf_version == 0) {
+    return std::log1p(clamped_utility * eta);
+  }
+  return std::log1p(clamped_utility);
 }
 
 inline torch::Tensor dcf_tensor_from_int_vector(const std::vector<int>& values) {
@@ -496,6 +526,26 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
         const T tau_A = std::max(dcf_tau_A, T(1e-3));
         const T tau_S = std::max(dcf_tau_S, T(1e-3));
         const T momentum = std::clamp(dcf_momentum, T(0), T(0.999));
+        const int export_version = (dcf_version >= 0 && dcf_version <= 3) ? dcf_version : 0;
+        const T beta = std::max(T(0), dcf_beta);
+
+        const char* export_version_name = "v1";
+        switch (export_version) {
+            case 1:
+                export_version_name = "v3a";
+                break;
+            case 2:
+                export_version_name = "v3b";
+                break;
+            case 3:
+                export_version_name = "v3c";
+                break;
+            default:
+                break;
+        }
+
+        dreamplacePrint(kINFO, "dcf export utility variant %s (beta=%f)\n",
+            export_version_name, static_cast<double>(beta));
 
         const auto endpoints = timer.report_negative_endpoints(ot::MAX);
         const size_t num_pins = timer.num_pins();
@@ -752,9 +802,9 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
 
             const int from_pin_id = from_itr->second;
             const int to_pin_id = to_itr->second;
+            const T total_mass = mass;
             const T severity_mass = dcf_hist_weighted_sum(hist, representatives);
             const T tail_mass = hist[2] + hist[3];
-            const T utility = severity_mass + T(0.5) * tail_mass;
             const T eta = dcf_pair_length(
                 pos,
                 num_nodes,
@@ -763,7 +813,13 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
                 pin_offset_y,
                 from_pin_id,
                 to_pin_id);
-            const T mapped_weight = std::log1p(std::max(T(0), utility * eta));
+            const T utility = dcf_export_utility(
+                export_version,
+                severity_mass,
+                tail_mass,
+                total_mass,
+                beta);
+            const T mapped_weight = dcf_map_export_weight(export_version, utility, eta);
             if (!std::isfinite(mapped_weight) || mapped_weight <= 0) {
                 continue;
             }

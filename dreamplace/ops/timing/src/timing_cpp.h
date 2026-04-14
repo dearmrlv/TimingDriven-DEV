@@ -76,6 +76,8 @@ public:
     double dcf_tau_A,
     double dcf_tau_S,
     double dcf_momentum,
+    int dcf_version,
+    double dcf_beta,
     torch::Tensor dcf_bin_edges,
     bool enable_dcf_diagnostics,
     int diagnostics_step_id,

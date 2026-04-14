@@ -346,6 +346,14 @@
     "description": "EMA momentum for DCF pin-pair weights",
     "default": 0.85
     },
+"dcf_version": {
+    "description": "DCF export utility version: v1|v3a|v3b|v3c",
+    "default": "v1"
+    },
+"dcf_beta": {
+    "description": "tail coefficient for DCF v3c utility",
+    "default": 0.25
+    },
 "dcf_bin_edges": {
     "description": "DCF deficit histogram bin edges in ps",
     "default": [20.0, 50.0, 150.0]

@@ -139,6 +139,8 @@ class TimingOpt(nn.Module):
         dcf_tau_A,
         dcf_tau_S,
         dcf_momentum,
+        dcf_version,
+        dcf_beta,
         dcf_bin_edges,
         enable_dcf_diagnostics,
         dcf_diag_dump_first_timing_step_only,
@@ -200,6 +202,8 @@ class TimingOpt(nn.Module):
         self.dcf_tau_A = float(dcf_tau_A)
         self.dcf_tau_S = float(dcf_tau_S)
         self.dcf_momentum = float(dcf_momentum)
+        self.dcf_version = str(dcf_version).lower()
+        self.dcf_beta = float(dcf_beta)
         self.enable_dcf_diagnostics = bool(enable_dcf_diagnostics)
         self.dcf_diag_dump_first_timing_step_only = bool(
             dcf_diag_dump_first_timing_step_only
@@ -210,6 +214,8 @@ class TimingOpt(nn.Module):
 
         if len(dcf_bin_edges) != 3:
             raise ValueError("dcf_bin_edges must contain exactly three entries")
+        if self.dcf_version not in {"v1", "v3a", "v3b", "v3c"}:
+            raise ValueError("dcf_version must be one of 'v1', 'v3a', 'v3b', or 'v3c'")
         # Convert the user-facing ps bins into the raw OpenTimer unit used by
         # the timing reports, mirroring the existing WNS/TNS normalization.
         raw_time_scale = timer.time_unit() * 1e15
@@ -294,6 +300,7 @@ class TimingOpt(nn.Module):
             logging.warning(
                 "DCF is generating pin-pair weights, but pin2pin_net_weighting is disabled"
             )
+        dcf_version_codes = {"v1": 0, "v3a": 1, "v3b": 2, "v3c": 3}
         return timing_cpp.update_net_weights(
             self.timer.raw_timer,
             n,
@@ -314,6 +321,8 @@ class TimingOpt(nn.Module):
             self.dcf_tau_A,
             self.dcf_tau_S,
             self.dcf_momentum,
+            dcf_version_codes[self.dcf_version],
+            self.dcf_beta,
             torch.from_numpy(self.dcf_bin_edges),
             self.enable_dcf_diagnostics,
             diagnostics_step_id,

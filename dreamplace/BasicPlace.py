@@ -686,6 +686,8 @@ class BasicPlace(nn.Module):
             dcf_tau_A=params.dcf_tau_A,
             dcf_tau_S=params.dcf_tau_S,
             dcf_momentum=params.dcf_momentum,
+            dcf_version=params.dcf_version,
+            dcf_beta=params.dcf_beta,
             dcf_bin_edges=params.dcf_bin_edges,
             enable_dcf_diagnostics=params.enable_dcf_diagnostics,
             dcf_diag_dump_first_timing_step_only=params.dcf_diag_dump_first_timing_step_only,
