@@ -1,0 +1,2 @@
+cases_total,v4_beats_v3b_tns,v4_beats_v3b_wns,v4_beats_v3c_b020_tns,v4_beats_v3c_b020_wns,v4_beats_v3b_hpwl,v4_avg_runtime_sec,v3b_avg_runtime_sec,v3c_b020_avg_runtime_sec,hpwl_runtime_note
+8,6,3,6,3,4,442.829,445.575,446.124,Compare per-case rows; v4 summary keeps only lightweight counts and mean runtimes.
