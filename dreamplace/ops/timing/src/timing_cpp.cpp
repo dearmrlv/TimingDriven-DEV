@@ -389,6 +389,9 @@ pybind11::dict updateNetWeightCppLauncher(
     T dcf_momentum,
     int dcf_version,
     T dcf_beta,
+    T dcf_v4_base_beta,
+    int dcf_v4_decay_start_step,
+    int dcf_v4_decay_end_step,
     bool enable_dcf_diagnostics,
     int diagnostics_step_id,
     bool diagnostics_dump_step,
@@ -410,6 +413,8 @@ pybind11::dict updateNetWeightCppLauncher(
        enable_dcf, dcf_bin_edges,                     \
        dcf_tau_A, dcf_tau_S, dcf_momentum,            \
        dcf_version, dcf_beta,                         \
+       dcf_v4_base_beta, dcf_v4_decay_start_step,     \
+       dcf_v4_decay_end_step,                         \
        enable_dcf_diagnostics, diagnostics_step_id,   \
        diagnostics_dump_step, dcf_diag_dump_state_stats, \
        dcf_diag_dump_pair_limit, dcf_diag_dump_topk,  \
@@ -455,6 +460,9 @@ pybind11::dict TimingCpp::update_net_weights(
     double dcf_momentum,
     int dcf_version,
     double dcf_beta,
+    double dcf_v4_base_beta,
+    int dcf_v4_decay_start_step,
+    int dcf_v4_decay_end_step,
     torch::Tensor dcf_bin_edges,
     bool enable_dcf_diagnostics,
     int diagnostics_step_id,
@@ -511,6 +519,9 @@ pybind11::dict TimingCpp::update_net_weights(
             static_cast<scalar_t>(dcf_momentum),
             dcf_version,
             static_cast<scalar_t>(dcf_beta),
+            static_cast<scalar_t>(dcf_v4_base_beta),
+            dcf_v4_decay_start_step,
+            dcf_v4_decay_end_step,
             enable_dcf_diagnostics,
             diagnostics_step_id,
             diagnostics_dump_step,

@@ -70,6 +70,8 @@ enum class NetWeightingScheme {
       bool enable_dcf, const T* dcf_bin_edges,                     \
       T dcf_tau_A, T dcf_tau_S, T dcf_momentum,                    \
       int dcf_version, T dcf_beta,                                 \
+      T dcf_v4_base_beta, int dcf_v4_decay_start_step,             \
+      int dcf_v4_decay_end_step,                                   \
       bool enable_dcf_diagnostics, int diagnostics_step_id,        \
       bool diagnostics_dump_step, bool dcf_diag_dump_state_stats,  \
       int dcf_diag_dump_pair_limit, int dcf_diag_dump_topk,        \
@@ -222,12 +224,37 @@ inline T dcf_pin_max_arrival(const ot::Pin& pin) {
 }
 
 template <typename T>
+inline T dcf_v4_effective_beta(
+    int timing_step_id,
+    T base_beta,
+    int decay_start_step,
+    int decay_end_step) {
+  const T clamped_base_beta = std::max(T(0), base_beta);
+  const int safe_start = std::max(1, decay_start_step);
+  const int safe_end = std::max(safe_start, decay_end_step);
+  if (timing_step_id <= 0 || timing_step_id < safe_start) {
+    return clamped_base_beta;
+  }
+  if (timing_step_id > safe_end) {
+    return T(0);
+  }
+  if (safe_end == safe_start) {
+    return timing_step_id < safe_end ? clamped_base_beta : T(0);
+  }
+  const T span = static_cast<T>(safe_end - safe_start + 1);
+  const T offset = static_cast<T>(timing_step_id - safe_start);
+  const T ratio = std::clamp(offset / span, T(0), T(1));
+  return clamped_base_beta * (T(1) - ratio);
+}
+
+template <typename T>
 inline T dcf_export_utility(
     int dcf_version,
     T severity_mass,
     T tail_mass,
     T total_mass,
-    T dcf_beta) {
+    T dcf_beta,
+    T dcf_v4_beta) {
   switch (dcf_version) {
     case 1:
       return severity_mass + T(0.5) * tail_mass;
@@ -235,6 +262,8 @@ inline T dcf_export_utility(
       return total_mass;
     case 3:
       return total_mass + dcf_beta * tail_mass;
+    case 4:
+      return total_mass + dcf_v4_beta * tail_mass;
     case 0:
     default:
       return severity_mass + T(0.5) * tail_mass;
@@ -526,8 +555,14 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
         const T tau_A = std::max(dcf_tau_A, T(1e-3));
         const T tau_S = std::max(dcf_tau_S, T(1e-3));
         const T momentum = std::clamp(dcf_momentum, T(0), T(0.999));
-        const int export_version = (dcf_version >= 0 && dcf_version <= 3) ? dcf_version : 0;
+        const int export_version = (dcf_version >= 0 && dcf_version <= 4) ? dcf_version : 0;
         const T beta = std::max(T(0), dcf_beta);
+        const T v4_base_beta = std::max(T(0), dcf_v4_base_beta);
+        const T v4_beta = dcf_v4_effective_beta(
+            diagnostics_step_id,
+            v4_base_beta,
+            dcf_v4_decay_start_step,
+            dcf_v4_decay_end_step);
 
         const char* export_version_name = "v1";
         switch (export_version) {
@@ -540,12 +575,18 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
             case 3:
                 export_version_name = "v3c";
                 break;
+            case 4:
+                export_version_name = "v4";
+                break;
             default:
                 break;
         }
 
-        dreamplacePrint(kINFO, "dcf export utility variant %s (beta=%f)\n",
-            export_version_name, static_cast<double>(beta));
+        dreamplacePrint(kINFO, "dcf export utility variant %s (beta=%f, v4_beta=%f, step=%d)\n",
+            export_version_name,
+            static_cast<double>(beta),
+            static_cast<double>(v4_beta),
+            diagnostics_step_id);
 
         const auto endpoints = timer.report_negative_endpoints(ot::MAX);
         const size_t num_pins = timer.num_pins();
@@ -818,7 +859,8 @@ struct NetWeighting<T, NetWeightingScheme::DCF> {
                 severity_mass,
                 tail_mass,
                 total_mass,
-                beta);
+                beta,
+                v4_beta);
             const T mapped_weight = dcf_map_export_weight(export_version, utility, eta);
             if (!std::isfinite(mapped_weight) || mapped_weight <= 0) {
                 continue;
