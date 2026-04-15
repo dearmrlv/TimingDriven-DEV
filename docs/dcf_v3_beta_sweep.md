@@ -53,12 +53,14 @@ Comparison methods in this pass:
   - `DCF v3b`
   - `DCF v3c beta=0.25`
 
-Local summary artifacts were generated at:
+Tracked review artifacts are committed at:
 
-- `results/dcf_v3_beta_sweep/summary/beta_sweep_metrics.csv`
-- `results/dcf_v3_beta_sweep/summary/superblue16_stability.csv`
-- `results/dcf_v3_beta_sweep/summary/superblue16_trajectory_long.csv`
-- `results/dcf_v3_beta_sweep/summary/superblue16_trajectory_vs_v3b.csv`
+- `docs/artifacts/dcf_v3_beta_sweep_metrics.csv`
+- `docs/artifacts/dcf_v3_superblue16_stability.csv`
+- `docs/artifacts/dcf_v3_superblue16_trajectory_long.csv`
+- `docs/artifacts/dcf_v3_superblue16_trajectory_vs_v3b.csv`
+
+The original runtime-generated copies still exist locally under `results/dcf_v3_beta_sweep/summary/`, but those are ignored by git and are not part of the remote review surface.
 
 ## Beta Sweep Results
 
@@ -106,10 +108,10 @@ So the `superblue16` ordering between `v3b` and `v3c beta=0.25` is not stable en
 
 ## Trajectory Summary: superblue16
 
-The full local trajectory files are:
+The full tracked trajectory files are:
 
-- `results/dcf_v3_beta_sweep/summary/superblue16_trajectory_long.csv`
-- `results/dcf_v3_beta_sweep/summary/superblue16_trajectory_vs_v3b.csv`
+- `docs/artifacts/dcf_v3_superblue16_trajectory_long.csv`
+- `docs/artifacts/dcf_v3_superblue16_trajectory_vs_v3b.csv`
 
 Main observations from the timing-step trajectories:
 
@@ -120,7 +122,7 @@ Main observations from the timing-step trajectories:
 - The larger-beta runs mainly change late-stage behavior rather than the early steps.
 - Exported pair count and total exported weight mass also separate more clearly in the later timing steps than in the first half of the run.
 
-Examples from `superblue16_trajectory_vs_v3b.csv`:
+Examples from `docs/artifacts/dcf_v3_superblue16_trajectory_vs_v3b.csv`:
 
 - `beta=0.20` vs `v3b`
   - step `7`: `wns_delta_vs_v3b = -0.3969`
@@ -182,6 +184,34 @@ Reason:
 - it is the best point on the key problem case `superblue16`
 - it remains competitive on `superblue18`
 - it improves on the current `beta=0.25` setting on both cases in this sweep
+
+## Review Summary
+
+### Best Beta Right Now
+
+- `DCF v3c` with `beta = 0.20`
+
+Reason:
+
+- it is the strongest point on `superblue16`
+- it improves on `beta = 0.25` on both cases in this sweep
+- it remains competitive with the better `superblue18` points, even though `0.10` is best on that case
+
+### Is `v3c` Clearly Better Than `v3b` On `superblue16`?
+
+No.
+
+- In the main sweep run, `v3c beta=0.20` is better than `v3b` on TNS, WNS, and HPWL.
+- But the repeat stability check was only run for `v3c beta=0.25`, and that repeat changed the `v3b` vs `v3c` ordering materially.
+- So the current evidence says `v3c` is promising on `superblue16`, but not yet clearly settled as better than `v3b` across repeated runs.
+
+### Is Another Beta Sweep Still Needed?
+
+Not immediately.
+
+- The current sweep already shows that `beta = 0.25` is not the best point.
+- It also identifies `beta = 0.20` as the strongest near-term candidate.
+- The more useful next check is a focused repeat/stability validation of `beta = 0.20`, not a broader new sweep.
 
 ## Conservative Takeaway
 

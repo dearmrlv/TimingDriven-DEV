@@ -1,0 +1,4 @@
+case,method,method_key_previous,method_key_repeat,variant,beta,previous_tns,repeat_tns,delta_tns,previous_wns,repeat_wns,delta_wns,previous_hpwl,repeat_hpwl,delta_hpwl,previous_runtime,repeat_runtime,delta_runtime
+superblue16,DCF v1,dcf_v1,dcf_v1,v1,,-99.117940,-74.930640,24.187300,-17.925586,-16.626910,1.298676,4.905974E+08,4.903485E+08,-248900.000000,224.523,223.551,-0.972000
+superblue16,DCF v3b,dcf_v3b,dcf_v3b,v3b,,-69.504020,-73.461280,-3.957260,-22.065291,-35.759039,-13.693748,4.397976E+08,4.394699E+08,-327700.000000,227.361,223.139,-4.222000
+superblue16,DCF v3c,dcf_v3c_b025,dcf_v3c_b025,v3c,0.25,-61.251220,-112.477060,-51.225840,-21.320693,-17.509695,3.810998,4.397108E+08,4.384692E+08,-1241600.000000,223.668,236.314,12.646000
