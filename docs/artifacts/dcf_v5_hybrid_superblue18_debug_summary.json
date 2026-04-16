@@ -1,0 +1,123 @@
+{
+  "case": "superblue18",
+  "timing_step_id": 1,
+  "lambdas": [
+    {
+      "timing_step_id": 1,
+      "scheme_name": "dcf_v5_hybrid_l010",
+      "hybrid_lambda": 0.10000000149011612,
+      "raw_pin2pin": {
+        "pair_count": 25805,
+        "total_weight_mass": 268460.8649625778,
+        "max_weight": 50.0,
+        "min_nonzero_weight": 10.0,
+        "top_pair_src_id": 1949,
+        "top_pair_dst_id": 1878649,
+        "top_pair_weight": 50.0
+      },
+      "mapped_mhat": {
+        "pair_count": 20277,
+        "total_weight_mass": 1081502592.0,
+        "max_weight": 6036132.0,
+        "min_nonzero_weight": 0.9494843482971191,
+        "top_pair_src_id": 2105068,
+        "top_pair_dst_id": 1778239,
+        "top_pair_weight": 1.0
+      },
+      "final_hybrid_dict": {
+        "pair_count": 25805,
+        "total_weight_mass": 268923.517288208,
+        "max_weight": 55.0,
+        "min_nonzero_weight": 10.0,
+        "top_pair_src_id": 1949,
+        "top_pair_dst_id": 1878649,
+        "top_pair_weight": 55.0
+      },
+      "exported_tensor_view": {
+        "pair_count": 25805,
+        "total_weight_mass": 268923.5,
+        "max_weight": 55.0,
+        "min_nonzero_weight": 10.0
+      },
+      "lambda": "0.10"
+    },
+    {
+      "timing_step_id": 1,
+      "scheme_name": "dcf_v5_hybrid_l020",
+      "hybrid_lambda": 0.20000000298023224,
+      "raw_pin2pin": {
+        "pair_count": 25805,
+        "total_weight_mass": 268460.8708934784,
+        "max_weight": 50.0,
+        "min_nonzero_weight": 10.0,
+        "top_pair_src_id": 1949,
+        "top_pair_dst_id": 1878649,
+        "top_pair_weight": 50.0
+      },
+      "mapped_mhat": {
+        "pair_count": 20277,
+        "total_weight_mass": 1081502592.0,
+        "max_weight": 6036132.0,
+        "min_nonzero_weight": 0.9494843482971191,
+        "top_pair_src_id": 2105068,
+        "top_pair_dst_id": 1778239,
+        "top_pair_weight": 1.0
+      },
+      "final_hybrid_dict": {
+        "pair_count": 25805,
+        "total_weight_mass": 269386.1756362915,
+        "max_weight": 60.000003814697266,
+        "min_nonzero_weight": 10.0,
+        "top_pair_src_id": 1949,
+        "top_pair_dst_id": 1878649,
+        "top_pair_weight": 60.000003814697266
+      },
+      "exported_tensor_view": {
+        "pair_count": 25805,
+        "total_weight_mass": 269386.1875,
+        "max_weight": 60.000003814697266,
+        "min_nonzero_weight": 10.0
+      },
+      "lambda": "0.20"
+    },
+    {
+      "timing_step_id": 1,
+      "scheme_name": "dcf_v5_hybrid_l030",
+      "hybrid_lambda": 0.30000001192092896,
+      "raw_pin2pin": {
+        "pair_count": 25805,
+        "total_weight_mass": 268460.9551038742,
+        "max_weight": 50.0,
+        "min_nonzero_weight": 10.0,
+        "top_pair_src_id": 1949,
+        "top_pair_dst_id": 1878649,
+        "top_pair_weight": 50.0
+      },
+      "mapped_mhat": {
+        "pair_count": 20277,
+        "total_weight_mass": 1081502592.0,
+        "max_weight": 6036132.0,
+        "min_nonzero_weight": 0.9494843482971191,
+        "top_pair_src_id": 2105068,
+        "top_pair_dst_id": 1778239,
+        "top_pair_weight": 1.0
+      },
+      "final_hybrid_dict": {
+        "pair_count": 25805,
+        "total_weight_mass": 269848.90571308136,
+        "max_weight": 65.0,
+        "min_nonzero_weight": 10.0,
+        "top_pair_src_id": 1949,
+        "top_pair_dst_id": 1878649,
+        "top_pair_weight": 65.0
+      },
+      "exported_tensor_view": {
+        "pair_count": 25805,
+        "total_weight_mass": 269848.90625,
+        "max_weight": 65.0,
+        "min_nonzero_weight": 10.0
+      },
+      "lambda": "0.30"
+    }
+  ]
+}
