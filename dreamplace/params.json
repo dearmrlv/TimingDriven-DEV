@@ -366,6 +366,10 @@
     "description": "timing step where DCF v4 beta reaches zero",
     "default": 10
     },
+"dcf_hybrid_lambda": {
+    "description": "DCF v5 hybrid augmentation weight",
+    "default": 0.10
+    },
 "dcf_bin_edges": {
     "description": "DCF deficit histogram bin edges in ps",
     "default": [20.0, 50.0, 150.0]

@@ -382,6 +382,7 @@ pybind11::dict updateNetWeightCppLauncher(
     T* net_criticality, T* net_criticality_deltas,
     T* net_weights, T* net_weight_deltas, const int* degree_map,
     pybind11::dict& pin2pin_net_weight,
+    pybind11::dict& pin2pin_base_net_weight,
     bool enable_dcf,
     const T* dcf_bin_edges,
     T dcf_tau_A,
@@ -392,6 +393,7 @@ pybind11::dict updateNetWeightCppLauncher(
     T dcf_v4_base_beta,
     int dcf_v4_decay_start_step,
     int dcf_v4_decay_end_step,
+    T dcf_hybrid_lambda,
     bool enable_dcf_diagnostics,
     int diagnostics_step_id,
     bool diagnostics_dump_step,
@@ -409,12 +411,12 @@ pybind11::dict updateNetWeightCppLauncher(
       pin_offset_x, pin_offset_y,                    \
       net_criticality, net_criticality_deltas,       \
        net_weights, net_weight_deltas, degree_map,    \
-       pin2pin_net_weight,                            \
+       pin2pin_net_weight, pin2pin_base_net_weight,   \
        enable_dcf, dcf_bin_edges,                     \
        dcf_tau_A, dcf_tau_S, dcf_momentum,            \
        dcf_version, dcf_beta,                         \
        dcf_v4_base_beta, dcf_v4_decay_start_step,     \
-       dcf_v4_decay_end_step,                         \
+       dcf_v4_decay_end_step, dcf_hybrid_lambda,      \
        enable_dcf_diagnostics, diagnostics_step_id,   \
        diagnostics_dump_step, dcf_diag_dump_state_stats, \
        dcf_diag_dump_pair_limit, dcf_diag_dump_topk,  \
@@ -431,6 +433,8 @@ pybind11::dict updateNetWeightCppLauncher(
       return SELECT_SCHEME(PIN2PIN);
     case 3:
       return SELECT_SCHEME(DCF);
+    case 4:
+      return SELECT_SCHEME(DCF_HYBRID);
     default:
       // WARNING: unsupported net-weighting scheme. Do nothing.
       // Do not report a warning since it has been done in python.
@@ -454,6 +458,7 @@ pybind11::dict TimingCpp::update_net_weights(
     torch::Tensor net_weights, torch::Tensor net_weight_deltas,
     torch::Tensor degree_map,
     pybind11::dict& pin2pin_net_weight,
+    pybind11::dict& pin2pin_base_net_weight,
     bool enable_dcf,
     double dcf_tau_A,
     double dcf_tau_S,
@@ -463,6 +468,7 @@ pybind11::dict TimingCpp::update_net_weights(
     double dcf_v4_base_beta,
     int dcf_v4_decay_start_step,
     int dcf_v4_decay_end_step,
+    double dcf_hybrid_lambda,
     torch::Tensor dcf_bin_edges,
     bool enable_dcf_diagnostics,
     int diagnostics_step_id,
@@ -512,6 +518,7 @@ pybind11::dict TimingCpp::update_net_weights(
             DREAMPLACE_TENSOR_DATA_PTR(net_weight_deltas, scalar_t),
             DREAMPLACE_TENSOR_DATA_PTR(degree_map, int),
             pin2pin_net_weight,
+            pin2pin_base_net_weight,
             enable_dcf,
             DREAMPLACE_TENSOR_DATA_PTR(dcf_bin_edges, scalar_t),
             static_cast<scalar_t>(dcf_tau_A),
@@ -522,6 +529,7 @@ pybind11::dict TimingCpp::update_net_weights(
             static_cast<scalar_t>(dcf_v4_base_beta),
             dcf_v4_decay_start_step,
             dcf_v4_decay_end_step,
+            static_cast<scalar_t>(dcf_hybrid_lambda),
             enable_dcf_diagnostics,
             diagnostics_step_id,
             diagnostics_dump_step,

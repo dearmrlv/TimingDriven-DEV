@@ -123,6 +123,7 @@ class TimingOpt(nn.Module):
         net_weights,
         net_weight_deltas,
         pin2pin_net_weight,
+        pin2pin_base_net_weight,
         wire_resistance_per_micron,
         wire_capacitance_per_micron,
         net_weighting_scheme,
@@ -144,6 +145,7 @@ class TimingOpt(nn.Module):
         dcf_v4_base_beta,
         dcf_v4_decay_start_step,
         dcf_v4_decay_end_step,
+        dcf_hybrid_lambda,
         dcf_bin_edges,
         enable_dcf_diagnostics,
         dcf_diag_dump_first_timing_step_only,
@@ -197,6 +199,7 @@ class TimingOpt(nn.Module):
         self.net_weighting_scheme = net_weighting_scheme
         self.momentum_decay_factor = momentum_decay_factor
         self.pin2pin_net_weight = pin2pin_net_weight
+        self.pin2pin_base_net_weight = pin2pin_base_net_weight
         self.pin2pin_max_weight = pin2pin_max_weight
         self.pin2pin_min_weight = pin2pin_min_weight
         self.pin2pin_accumulate_weight = pin2pin_accumulate_weight
@@ -210,6 +213,7 @@ class TimingOpt(nn.Module):
         self.dcf_v4_base_beta = float(dcf_v4_base_beta)
         self.dcf_v4_decay_start_step = int(dcf_v4_decay_start_step)
         self.dcf_v4_decay_end_step = int(dcf_v4_decay_end_step)
+        self.dcf_hybrid_lambda = float(dcf_hybrid_lambda)
         self.enable_dcf_diagnostics = bool(enable_dcf_diagnostics)
         self.dcf_diag_dump_first_timing_step_only = bool(
             dcf_diag_dump_first_timing_step_only
@@ -303,14 +307,19 @@ class TimingOpt(nn.Module):
             scm = 2
         elif self.net_weighting_scheme == "dcf":
             scm = 3
+        elif self.net_weighting_scheme == "dcf_hybrid":
+            scm = 4
         else:
             logging.warning(
                 "unsupported net-weighting scheme %r" % (self.net_weighting_scheme)
             )
             scm = -1  # Unsupported scheme.
-        if self.net_weighting_scheme == "dcf" and not self.pin2pin_net_weighting:
+        if (
+            self.net_weighting_scheme in {"dcf", "dcf_hybrid"}
+            and not self.pin2pin_net_weighting
+        ):
             logging.warning(
-                "DCF is generating pin-pair weights, but pin2pin_net_weighting is disabled"
+                "Selected timing scheme is generating pin-pair weights, but pin2pin_net_weighting is disabled"
             )
         dcf_version_codes = {"v1": 0, "v3a": 1, "v3b": 2, "v3c": 3, "v4": 4}
         return timing_cpp.update_net_weights(
@@ -329,6 +338,7 @@ class TimingOpt(nn.Module):
             torch.from_numpy(self.net_weight_deltas),
             torch.from_numpy(self.degree_map),
             self.pin2pin_net_weight,
+            self.pin2pin_base_net_weight,
             self.enable_dcf,
             self.dcf_tau_A,
             self.dcf_tau_S,
@@ -338,6 +348,7 @@ class TimingOpt(nn.Module):
             self.dcf_v4_base_beta,
             self.dcf_v4_decay_start_step,
             self.dcf_v4_decay_end_step,
+            self.dcf_hybrid_lambda,
             torch.from_numpy(self.dcf_bin_edges),
             self.enable_dcf_diagnostics,
             diagnostics_step_id,
