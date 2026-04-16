@@ -136,6 +136,16 @@ class DcfDiagnosticsManager(object):
         self.pin_offset_x = np.asarray(placedb.pin_offset_x)
         self.pin_offset_y = np.asarray(placedb.pin_offset_y)
         self.snapshot_root_dir = getattr(params, "dcf_diag_replay_snapshot_dir", "")
+        self.hybrid_debug_enabled = bool(getattr(params, "dcf_hybrid_debug", 0))
+        self.hybrid_debug_first_step_only = bool(
+            getattr(params, "dcf_hybrid_debug_dump_first_timing_step_only", 0)
+        )
+        self.hybrid_debug_root_dir = getattr(
+            params, "dcf_hybrid_debug_dump_dir", "results/hybrid_debug"
+        )
+        self.hybrid_debug_root_dir = Path(self.hybrid_debug_root_dir)
+        if not self.hybrid_debug_root_dir.is_absolute():
+            self.hybrid_debug_root_dir = self.hybrid_debug_root_dir.resolve()
         if self.snapshot_root_dir:
             self.snapshot_root_dir = Path(self.snapshot_root_dir)
             if not self.snapshot_root_dir.is_absolute():
@@ -343,6 +353,157 @@ class DcfDiagnosticsManager(object):
             json.dump(payload, fout, indent=2, default=_json_default)
             fout.write("\n")
         return path
+
+    def write_csv_rows(self, output_path, fieldnames, rows):
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="") as fout:
+            writer = csv.DictWriter(fout, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        return path
+
+    def build_top_pair_rows(self, pos, pair_dict, limit=10):
+        src_ids, dst_ids, weights, lengths = self._pair_arrays(pos, pair_dict)
+        if weights.size == 0:
+            return []
+        order = np.argsort(weights)[::-1][:limit]
+        rows = []
+        for idx in order:
+            rows.append(
+                {
+                    "src_id": int(src_ids[idx]),
+                    "src_name": self.pin_names[int(src_ids[idx])],
+                    "dst_id": int(dst_ids[idx]),
+                    "dst_name": self.pin_names[int(dst_ids[idx])],
+                    "weight": float(weights[idx]),
+                    "length": float(lengths[idx]),
+                }
+            )
+        return rows
+
+    def build_stage_summary_from_dict(self, pos, pair_dict):
+        src_ids, dst_ids, weights, _ = self._pair_arrays(pos, pair_dict)
+        if weights.size == 0:
+            return {
+                "pair_count": 0,
+                "total_weight_mass": 0.0,
+                "max_weight": 0.0,
+                "min_nonzero_weight": 0.0,
+                "top_pair_src_id": None,
+                "top_pair_dst_id": None,
+                "top_pair_weight": 0.0,
+            }
+        top_idx = int(np.argmax(weights))
+        positive = weights[weights > 0]
+        return {
+            "pair_count": int(weights.size),
+            "total_weight_mass": float(weights.sum()),
+            "max_weight": float(weights[top_idx]),
+            "min_nonzero_weight": float(positive.min()) if positive.size else 0.0,
+            "top_pair_src_id": int(src_ids[top_idx]),
+            "top_pair_dst_id": int(dst_ids[top_idx]),
+            "top_pair_weight": float(weights[top_idx]),
+        }
+
+    def hybrid_debug_step_dir(self, timing_step_id):
+        path = (
+            self.hybrid_debug_root_dir
+            / self.case_name
+            / self.scheme_name
+            / (f"step_{int(timing_step_id):03d}")
+        )
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def should_dump_hybrid_debug_step(self, timing_step_id):
+        if not self.hybrid_debug_enabled:
+            return False
+        if self.hybrid_debug_first_step_only:
+            return int(timing_step_id) == 1
+        return True
+
+    def dump_hybrid_debug(
+        self,
+        pos,
+        timing_step_id,
+        base_pair_dict,
+        final_pair_dict,
+        timing_diag,
+        exported_tensor_count,
+        exported_tensor_weight_mass,
+        exported_tensor_max_weight,
+        exported_tensor_min_nonzero_weight,
+    ):
+        if not self.should_dump_hybrid_debug_step(timing_step_id):
+            return None
+
+        step_dir = self.hybrid_debug_step_dir(timing_step_id)
+        base_rows = self.build_top_pair_rows(pos, base_pair_dict, limit=10)
+        final_rows = self.build_top_pair_rows(pos, final_pair_dict, limit=10)
+        fieldnames = ["src_id", "src_name", "dst_id", "dst_name", "weight", "length"]
+        self.write_csv_rows(step_dir / "base_pairs.csv", fieldnames, base_rows)
+        self.write_csv_rows(step_dir / "final_pairs.csv", fieldnames, final_rows)
+
+        mhat_rows = []
+        src_tensor = timing_diag.get("hybrid_mhat_src_ids")
+        dst_tensor = timing_diag.get("hybrid_mhat_dst_ids")
+        val_tensor = timing_diag.get("hybrid_mhat_values")
+        if src_tensor is not None and dst_tensor is not None and val_tensor is not None:
+            src_ids = src_tensor.detach().cpu().numpy()
+            dst_ids = dst_tensor.detach().cpu().numpy()
+            values = val_tensor.detach().cpu().numpy()
+            for src_id, dst_id, value in zip(src_ids, dst_ids, values):
+                mhat_rows.append(
+                    {
+                        "src_id": int(src_id),
+                        "src_name": self.pin_names[int(src_id)],
+                        "dst_id": int(dst_id),
+                        "dst_name": self.pin_names[int(dst_id)],
+                        "mhat": float(value),
+                    }
+                )
+        self.write_csv_rows(
+            step_dir / "mhat_pairs.csv",
+            ["src_id", "src_name", "dst_id", "dst_name", "mhat"],
+            mhat_rows,
+        )
+
+        payload = {
+            "timing_step_id": int(timing_step_id),
+            "scheme_name": self.scheme_name,
+            "hybrid_lambda": _safe_float(timing_diag.get("hybrid_lambda")),
+            "raw_pin2pin": self.build_stage_summary_from_dict(pos, base_pair_dict),
+            "mapped_mhat": {
+                "pair_count": int(timing_diag.get("hybrid_mhat_pair_count") or 0),
+                "total_weight_mass": _safe_float(
+                    timing_diag.get("hybrid_mhat_total_mass")
+                )
+                or 0.0,
+                "max_weight": _safe_float(timing_diag.get("hybrid_max_pair_mass"))
+                or 0.0,
+                "min_nonzero_weight": float(
+                    min(
+                        (row["mhat"] for row in mhat_rows if row["mhat"] > 0),
+                        default=0.0,
+                    )
+                ),
+                "top_pair_src_id": mhat_rows[0]["src_id"] if mhat_rows else None,
+                "top_pair_dst_id": mhat_rows[0]["dst_id"] if mhat_rows else None,
+                "top_pair_weight": mhat_rows[0]["mhat"] if mhat_rows else 0.0,
+            },
+            "final_hybrid_dict": self.build_stage_summary_from_dict(
+                pos, final_pair_dict
+            ),
+            "exported_tensor_view": {
+                "pair_count": int(exported_tensor_count),
+                "total_weight_mass": float(exported_tensor_weight_mass),
+                "max_weight": float(exported_tensor_max_weight),
+                "min_nonzero_weight": float(exported_tensor_min_nonzero_weight),
+            },
+        }
+        self.write_json(step_dir / "debug_summary.json", payload)
+        return step_dir
 
     def write_position_fingerprint(self, output_dir, position_fingerprint):
         output_dir = Path(output_dir)

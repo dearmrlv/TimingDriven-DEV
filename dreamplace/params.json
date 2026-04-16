@@ -370,6 +370,18 @@
     "description": "DCF v5 hybrid augmentation weight",
     "default": 0.10
     },
+"dcf_hybrid_debug": {
+    "description": "whether enable DCF hybrid engagement debug dumping",
+    "default": 0
+    },
+"dcf_hybrid_debug_dump_first_timing_step_only": {
+    "description": "restrict DCF hybrid engagement debug dumping to the first timing step",
+    "default": 0
+    },
+"dcf_hybrid_debug_dump_dir": {
+    "description": "root directory for DCF hybrid engagement debug outputs",
+    "default": "results/hybrid_debug"
+    },
 "dcf_bin_edges": {
     "description": "DCF deficit histogram bin edges in ps",
     "default": [20.0, 50.0, 150.0]

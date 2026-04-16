@@ -73,6 +73,7 @@ enum class NetWeightingScheme {
       int dcf_version, T dcf_beta,                                 \
       T dcf_v4_base_beta, int dcf_v4_decay_start_step,             \
       int dcf_v4_decay_end_step, T dcf_hybrid_lambda,              \
+      bool dcf_hybrid_debug,                                       \
       bool enable_dcf_diagnostics, int diagnostics_step_id,        \
       bool diagnostics_dump_step, bool dcf_diag_dump_state_stats,  \
       int dcf_diag_dump_pair_limit, int dcf_diag_dump_topk,        \
@@ -318,6 +319,20 @@ inline torch::Tensor dcf_tensor_from_flat_vector(
       .clone();
 }
 
+template <typename T>
+inline torch::Tensor dcf_tensor_from_vector(const std::vector<T>& values) {
+  auto options = torch::TensorOptions().dtype(
+      std::is_same<T, float>::value ? torch::kFloat32 : torch::kFloat64);
+  if (values.empty()) {
+    return torch::zeros({0}, options);
+  }
+  return torch::from_blob(
+      const_cast<T*>(values.data()),
+      {static_cast<long>(values.size())},
+      options)
+      .clone();
+}
+
 ////////////////////////////////////////////////////////////////////////////
 // Partial specialization of naive net-weighting schemes.
 template <typename T>
@@ -517,7 +532,7 @@ struct NetWeighting<T, NetWeightingScheme::PIN2PIN> {
         int num_unique_pairs = 0;
         int num_all_pairs = 0;
 
-        update_pin2pin_weight_dict(
+        update_pin2pin_weight_dict<T>(
             timer,
             pin_name2id_map,
             pin2pin_net_weight,
@@ -1013,10 +1028,11 @@ struct NetWeighting<T, NetWeightingScheme::DCF_HYBRID> {
         const T hybrid_lambda = std::clamp(dcf_hybrid_lambda, T(0), T(1));
         dreamplacePrint(kINFO, "apply dcf hybrid net-weighting scheme (lambda=%f)\n", static_cast<double>(hybrid_lambda));
         auto begT = std::chrono::steady_clock::now();
+        const bool collect_hybrid_debug = dcf_hybrid_debug;
 
         int num_unique_pairs = 0;
         int num_all_pairs = 0;
-        update_pin2pin_weight_dict(
+        update_pin2pin_weight_dict<T>(
             timer,
             pin_name2id_map,
             pin2pin_base_net_weight,
@@ -1156,7 +1172,13 @@ struct NetWeighting<T, NetWeightingScheme::DCF_HYBRID> {
 
         std::unordered_map<std::pair<int, int>, T, pair_hash, pair_equal> pair_mass;
         T max_pair_mass = T(0);
+        T total_mhat_mass = T(0);
         size_t arcs_with_mass = 0;
+        size_t mapped_pairs = 0;
+        std::vector<std::tuple<T, int, int>> top_mhat_pairs;
+        if (collect_hybrid_debug) {
+            top_mhat_pairs.reserve(num_arcs);
+        }
         for (const auto& arc : timer.arcs()) {
             const auto& hist = arc_hist[arc.idx()];
             const T mass = dcf_hist_mass(hist);
@@ -1178,6 +1200,11 @@ struct NetWeighting<T, NetWeightingScheme::DCF_HYBRID> {
             }
             pair_mass[{from_itr->second, to_itr->second}] = mass;
             max_pair_mass = std::max(max_pair_mass, mass);
+            total_mhat_mass += mass;
+            ++mapped_pairs;
+            if (collect_hybrid_debug) {
+                top_mhat_pairs.emplace_back(mass, from_itr->second, to_itr->second);
+            }
         }
 
         pin2pin_net_weight.attr("clear")();
@@ -1221,6 +1248,30 @@ struct NetWeighting<T, NetWeightingScheme::DCF_HYBRID> {
         diagnostics["hybrid_max_pair_mass"] = pybind11::float_(max_pair_mass);
         diagnostics["hybrid_reweighted_pairs"] = pybind11::int_(hybrid_reweighted_pairs);
         diagnostics["hybrid_exported_pairs"] = pybind11::int_(exported_pairs);
+        diagnostics["hybrid_mhat_pair_count"] = pybind11::int_(mapped_pairs);
+        diagnostics["hybrid_mhat_total_mass"] = pybind11::float_(total_mhat_mass);
+        if (collect_hybrid_debug) {
+            std::sort(top_mhat_pairs.begin(), top_mhat_pairs.end(), [](const auto& lhs, const auto& rhs) {
+                return std::get<0>(lhs) > std::get<0>(rhs);
+            });
+            if (top_mhat_pairs.size() > 10) {
+                top_mhat_pairs.resize(10);
+            }
+            std::vector<int> src_ids;
+            std::vector<int> dst_ids;
+            std::vector<T> mhat_values;
+            src_ids.reserve(top_mhat_pairs.size());
+            dst_ids.reserve(top_mhat_pairs.size());
+            mhat_values.reserve(top_mhat_pairs.size());
+            for (const auto& [mass, src, dst] : top_mhat_pairs) {
+                src_ids.push_back(src);
+                dst_ids.push_back(dst);
+                mhat_values.push_back(max_pair_mass > 0 ? mass / max_pair_mass : T(0));
+            }
+            diagnostics["hybrid_mhat_src_ids"] = dcf_tensor_from_int_vector(src_ids);
+            diagnostics["hybrid_mhat_dst_ids"] = dcf_tensor_from_int_vector(dst_ids);
+            diagnostics["hybrid_mhat_values"] = dcf_tensor_from_vector(mhat_values);
+        }
         return diagnostics;
     }
 };

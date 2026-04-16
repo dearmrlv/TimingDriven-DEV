@@ -514,6 +514,46 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                                 placedb.pin2pin_net_weight
                             )
 
+                        exported_tensor_count = int(placedb.length[0])
+                        exported_tensor_weight_mass = 0.0
+                        exported_tensor_max_weight = 0.0
+                        exported_tensor_min_nonzero_weight = 0.0
+                        if (
+                            self.device != torch.device("cpu")
+                            and exported_tensor_count > 0
+                        ):
+                            active_weights = (
+                                self.data_collections.weights[:exported_tensor_count]
+                                .detach()
+                                .cpu()
+                                .numpy()
+                            )
+                            exported_tensor_weight_mass = float(active_weights.sum())
+                            exported_tensor_max_weight = float(active_weights.max())
+                            positive_weights = active_weights[active_weights > 0]
+                            if positive_weights.size > 0:
+                                exported_tensor_min_nonzero_weight = float(
+                                    positive_weights.min()
+                                )
+
+                        if (
+                            params.net_weighting_scheme == "dcf_hybrid"
+                            and diagnostics_mgr.should_dump_hybrid_debug_step(
+                                timing_step_id
+                            )
+                        ):
+                            diagnostics_mgr.dump_hybrid_debug(
+                                pos_cpu,
+                                timing_step_id,
+                                placedb.pin2pin_base_net_weight,
+                                placedb.pin2pin_net_weight,
+                                timing_diag,
+                                exported_tensor_count,
+                                exported_tensor_weight_mass,
+                                exported_tensor_max_weight,
+                                exported_tensor_min_nonzero_weight,
+                            )
+
                         timing_update_total_runtime_sec = (
                             time.time() - timing_update_beg
                         )

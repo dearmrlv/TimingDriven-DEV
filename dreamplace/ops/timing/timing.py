@@ -146,6 +146,7 @@ class TimingOpt(nn.Module):
         dcf_v4_decay_start_step,
         dcf_v4_decay_end_step,
         dcf_hybrid_lambda,
+        dcf_hybrid_debug,
         dcf_bin_edges,
         enable_dcf_diagnostics,
         dcf_diag_dump_first_timing_step_only,
@@ -214,6 +215,7 @@ class TimingOpt(nn.Module):
         self.dcf_v4_decay_start_step = int(dcf_v4_decay_start_step)
         self.dcf_v4_decay_end_step = int(dcf_v4_decay_end_step)
         self.dcf_hybrid_lambda = float(dcf_hybrid_lambda)
+        self.dcf_hybrid_debug = bool(dcf_hybrid_debug)
         self.enable_dcf_diagnostics = bool(enable_dcf_diagnostics)
         self.dcf_diag_dump_first_timing_step_only = bool(
             dcf_diag_dump_first_timing_step_only
@@ -349,6 +351,7 @@ class TimingOpt(nn.Module):
             self.dcf_v4_decay_start_step,
             self.dcf_v4_decay_end_step,
             self.dcf_hybrid_lambda,
+            self.dcf_hybrid_debug,
             torch.from_numpy(self.dcf_bin_edges),
             self.enable_dcf_diagnostics,
             diagnostics_step_id,

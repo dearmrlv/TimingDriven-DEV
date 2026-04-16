@@ -9,6 +9,10 @@ OUTPUT_TAG=${OUTPUT_TAG:-"dcf_v5_hybrid_stage1"}
 RUN_LABEL=${RUN_LABEL:-""}
 DEFAULT_CASES=(superblue16 superblue3 superblue18)
 METHOD_KEYS=${METHOD_KEYS:-"dcf_v3b,dcf_v4,dcf_v5_hybrid_l010,dcf_v5_hybrid_l020,dcf_v5_hybrid_l030"}
+DCF_HYBRID_DEBUG=${DCF_HYBRID_DEBUG:-0}
+DCF_HYBRID_DEBUG_DUMP_FIRST_TIMING_STEP_ONLY=${DCF_HYBRID_DEBUG_DUMP_FIRST_TIMING_STEP_ONLY:-0}
+DCF_HYBRID_DEBUG_DUMP_DIR=${DCF_HYBRID_DEBUG_DUMP_DIR:-"$ROOT_DIR/results/hybrid_debug"}
+DCF_DIAG_FIRST_STEP_ONLY=${DCF_DIAG_FIRST_STEP_ONLY:-0}
 METHOD_SPECS=(
   "dcf_v3b|DCF v3b|dcf|v3b|"
   "dcf_v4|DCF v4|dcf|v4|"
@@ -75,7 +79,7 @@ for case_name in "${cases[@]}"; do
 
     mkdir -p "$run_dir" "$log_dir"
 
-    "$VENV_PYTHON" - "$source_config" "$runtime_config" "$method_result_dir" "$diagnostics_root" "$method_key" "$scheme" "$version" "$hybrid_lambda" "$RUN_LABEL" <<'PY'
+    "$VENV_PYTHON" - "$source_config" "$runtime_config" "$method_result_dir" "$diagnostics_root" "$method_key" "$scheme" "$version" "$hybrid_lambda" "$RUN_LABEL" "$DCF_HYBRID_DEBUG" "$DCF_HYBRID_DEBUG_DUMP_FIRST_TIMING_STEP_ONLY" "$DCF_HYBRID_DEBUG_DUMP_DIR" "$DCF_DIAG_FIRST_STEP_ONLY" <<'PY'
 import json
 import pathlib
 import sys
@@ -89,6 +93,10 @@ scheme = sys.argv[6]
 version = sys.argv[7]
 hybrid_lambda = sys.argv[8]
 run_label = sys.argv[9]
+hybrid_debug = bool(int(sys.argv[10]))
+hybrid_debug_first_step_only = bool(int(sys.argv[11]))
+hybrid_debug_dump_dir = sys.argv[12]
+diag_first_step_only = bool(int(sys.argv[13]))
 
 with source_path.open() as f:
     data = json.load(f)
@@ -106,7 +114,7 @@ if hybrid_lambda:
     data["dcf_hybrid_lambda"] = float(hybrid_lambda)
 data["enable_dcf_diagnostics"] = 1
 data["dcf_diag_dump_dir"] = str(diagnostics_root)
-data["dcf_diag_dump_first_timing_step_only"] = 0
+data["dcf_diag_dump_first_timing_step_only"] = 1 if diag_first_step_only else 0
 data["dcf_diag_dump_step_ids"] = []
 data["dcf_diag_save_snapshot_step_ids"] = []
 data["dcf_diag_replay_snapshot_dir"] = ""
@@ -117,6 +125,9 @@ data["dcf_diag_dump_state_stats"] = 0
 data["dcf_diag_dump_topk"] = 1000
 data["dcf_diag_dump_term_grad_norms"] = 0
 data["dcf_diag_scheme_tag"] = method_key if not run_label else f"{method_key}_{run_label}"
+data["dcf_hybrid_debug"] = 1 if hybrid_debug else 0
+data["dcf_hybrid_debug_dump_first_timing_step_only"] = 1 if hybrid_debug_first_step_only else 0
+data["dcf_hybrid_debug_dump_dir"] = hybrid_debug_dump_dir
 
 runtime_path.parent.mkdir(parents=True, exist_ok=True)
 with runtime_path.open("w") as f:
