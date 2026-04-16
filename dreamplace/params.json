@@ -382,6 +382,10 @@
     "description": "root directory for DCF hybrid engagement debug outputs",
     "default": "results/hybrid_debug"
     },
+"dcf_hybrid_debug_summary_only": {
+    "description": "emit only compact DCF hybrid engagement summaries without pair CSV dumps",
+    "default": 0
+    },
 "dcf_bin_edges": {
     "description": "DCF deficit histogram bin edges in ps",
     "default": [20.0, 50.0, 150.0]

@@ -11,7 +11,8 @@ DEFAULT_CASES=(superblue16 superblue3 superblue18)
 METHOD_KEYS=${METHOD_KEYS:-"dcf_v3b,dcf_v4,dcf_v5_hybrid_l010,dcf_v5_hybrid_l020,dcf_v5_hybrid_l030"}
 DCF_HYBRID_DEBUG=${DCF_HYBRID_DEBUG:-0}
 DCF_HYBRID_DEBUG_DUMP_FIRST_TIMING_STEP_ONLY=${DCF_HYBRID_DEBUG_DUMP_FIRST_TIMING_STEP_ONLY:-0}
-DCF_HYBRID_DEBUG_DUMP_DIR=${DCF_HYBRID_DEBUG_DUMP_DIR:-"$ROOT_DIR/results/hybrid_debug"}
+DCF_HYBRID_DEBUG_DUMP_DIR=${DCF_HYBRID_DEBUG_DUMP_DIR:-"$ROOT_DIR/results/$OUTPUT_TAG/hybrid_debug"}
+DCF_HYBRID_DEBUG_SUMMARY_ONLY=${DCF_HYBRID_DEBUG_SUMMARY_ONLY:-1}
 DCF_DIAG_FIRST_STEP_ONLY=${DCF_DIAG_FIRST_STEP_ONLY:-0}
 METHOD_SPECS=(
   "dcf_v3b|DCF v3b|dcf|v3b|"
@@ -79,7 +80,7 @@ for case_name in "${cases[@]}"; do
 
     mkdir -p "$run_dir" "$log_dir"
 
-    "$VENV_PYTHON" - "$source_config" "$runtime_config" "$method_result_dir" "$diagnostics_root" "$method_key" "$scheme" "$version" "$hybrid_lambda" "$RUN_LABEL" "$DCF_HYBRID_DEBUG" "$DCF_HYBRID_DEBUG_DUMP_FIRST_TIMING_STEP_ONLY" "$DCF_HYBRID_DEBUG_DUMP_DIR" "$DCF_DIAG_FIRST_STEP_ONLY" <<'PY'
+    "$VENV_PYTHON" - "$source_config" "$runtime_config" "$method_result_dir" "$diagnostics_root" "$method_key" "$scheme" "$version" "$hybrid_lambda" "$RUN_LABEL" "$DCF_HYBRID_DEBUG" "$DCF_HYBRID_DEBUG_DUMP_FIRST_TIMING_STEP_ONLY" "$DCF_HYBRID_DEBUG_DUMP_DIR" "$DCF_HYBRID_DEBUG_SUMMARY_ONLY" "$DCF_DIAG_FIRST_STEP_ONLY" <<'PY'
 import json
 import pathlib
 import sys
@@ -96,7 +97,8 @@ run_label = sys.argv[9]
 hybrid_debug = bool(int(sys.argv[10]))
 hybrid_debug_first_step_only = bool(int(sys.argv[11]))
 hybrid_debug_dump_dir = sys.argv[12]
-diag_first_step_only = bool(int(sys.argv[13]))
+hybrid_debug_summary_only = bool(int(sys.argv[13]))
+diag_first_step_only = bool(int(sys.argv[14]))
 
 with source_path.open() as f:
     data = json.load(f)
@@ -128,6 +130,7 @@ data["dcf_diag_scheme_tag"] = method_key if not run_label else f"{method_key}_{r
 data["dcf_hybrid_debug"] = 1 if hybrid_debug else 0
 data["dcf_hybrid_debug_dump_first_timing_step_only"] = 1 if hybrid_debug_first_step_only else 0
 data["dcf_hybrid_debug_dump_dir"] = hybrid_debug_dump_dir
+data["dcf_hybrid_debug_summary_only"] = 1 if hybrid_debug_summary_only else 0
 
 runtime_path.parent.mkdir(parents=True, exist_ok=True)
 with runtime_path.open("w") as f:

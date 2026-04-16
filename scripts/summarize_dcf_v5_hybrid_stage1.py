@@ -51,10 +51,16 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
     parser.add_argument("--tag", default="dcf_v5_hybrid_stage1")
+    parser.add_argument("--debug-dir", default=None)
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
     result_root = root / "results" / args.tag
+    debug_root = (
+        Path(args.debug_dir).resolve()
+        if args.debug_dir
+        else result_root / "hybrid_debug"
+    )
     artifacts_root = root / "docs" / "artifacts"
 
     metric_rows: list[dict[str, object]] = []
@@ -107,6 +113,70 @@ def main() -> None:
             "hpwl",
             "runtime",
             "source",
+        ],
+    )
+
+    engagement_rows: list[dict[str, object]] = []
+    for case_name in BASELINES:
+        for method_key, _, lam in METHOD_ORDER[3:]:
+            summary_path = (
+                debug_root / case_name / method_key / "step_001" / "debug_summary.json"
+            )
+            with summary_path.open() as f:
+                summary = json.load(f)
+            engagement_rows.append(
+                {
+                    "case_name": case_name,
+                    "lambda": lam,
+                    "first_timing_step_id": summary["timing_step_id"],
+                    "base_pin2pin_pair_count": summary["raw_pin2pin"]["pair_count"],
+                    "base_pin2pin_total_weight_mass": summary["raw_pin2pin"][
+                        "total_weight_mass"
+                    ],
+                    "mapped_mhat_pair_count": summary["mapped_mhat"]["pair_count"],
+                    "mapped_mhat_total_mass": summary["mapped_mhat"][
+                        "total_weight_mass"
+                    ],
+                    "final_hybrid_pair_count": summary["final_hybrid_dict"][
+                        "pair_count"
+                    ],
+                    "final_hybrid_total_weight_mass": summary["final_hybrid_dict"][
+                        "total_weight_mass"
+                    ],
+                    "exported_tensor_pair_count": summary["exported_tensor_view"][
+                        "pair_count"
+                    ],
+                    "exported_tensor_total_weight_mass": summary[
+                        "exported_tensor_view"
+                    ]["total_weight_mass"],
+                    "top_pair_weight_before_export": summary["raw_pin2pin"][
+                        "top_pair_weight"
+                    ],
+                    "top_pair_weight_after_export": summary["final_hybrid_dict"][
+                        "top_pair_weight"
+                    ],
+                }
+            )
+    engagement_rows.sort(
+        key=lambda row: (case_order[row["case_name"]], float(row["lambda"]))
+    )
+    write_csv(
+        artifacts_root / "dcf_v5_hybrid_stage1_engagement_sanity.csv",
+        engagement_rows,
+        [
+            "case_name",
+            "lambda",
+            "first_timing_step_id",
+            "base_pin2pin_pair_count",
+            "base_pin2pin_total_weight_mass",
+            "mapped_mhat_pair_count",
+            "mapped_mhat_total_mass",
+            "final_hybrid_pair_count",
+            "final_hybrid_total_weight_mass",
+            "exported_tensor_pair_count",
+            "exported_tensor_total_weight_mass",
+            "top_pair_weight_before_export",
+            "top_pair_weight_after_export",
         ],
     )
 

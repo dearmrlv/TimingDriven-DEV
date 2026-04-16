@@ -1,19 +1,19 @@
 case,method,method_key,lambda,tns,wns,hpwl,runtime,source
 superblue16,Efficient-TDP,efficient_tdp_readme,-,-22.604395,-7.841117,4.726394E+08,319.362,README.research.md
-superblue16,DCF v3b,dcf_v3b,-,-1129.819360,-45.866555,1.195143E+09,413.362,dcf_v5_hybrid_stage1
-superblue16,DCF v4,dcf_v4,-,-58.327270,-16.103830,4.663724E+08,390.977,dcf_v5_hybrid_stage1
-superblue16,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-254.390580,-14.251828,4.218739E+08,248.445,dcf_v5_hybrid_stage1
-superblue16,DCF v5 hybrid,dcf_v5_hybrid_l020,0.20,-254.390580,-14.251828,4.218739E+08,316.711,dcf_v5_hybrid_stage1
-superblue16,DCF v5 hybrid,dcf_v5_hybrid_l030,0.30,-254.390580,-14.251828,4.218739E+08,228.378,dcf_v5_hybrid_stage1
+superblue16,DCF v3b,dcf_v3b,-,-1225.894240,-46.501246,1.206730E+09,353.094,dcf_v5_hybrid_stage1_rerun
+superblue16,DCF v4,dcf_v4,-,-1701.940960,-47.952473,1.251260E+09,371.817,dcf_v5_hybrid_stage1_rerun
+superblue16,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-17.382887,-12.364184,4.638303E+08,443.169,dcf_v5_hybrid_stage1_rerun
+superblue16,DCF v5 hybrid,dcf_v5_hybrid_l020,0.20,-19.920288,-23.250348,4.636246E+08,447.309,dcf_v5_hybrid_stage1_rerun
+superblue16,DCF v5 hybrid,dcf_v5_hybrid_l030,0.30,-20.068239,-16.058911,4.635145E+08,461.036,dcf_v5_hybrid_stage1_rerun
 superblue3,Efficient-TDP,efficient_tdp_readme,-,-19.854089,-11.724317,4.628147E+08,554.147,README.research.md
-superblue3,DCF v3b,dcf_v3b,-,-1303.412080,-172.049531,2.125081E+09,748.897,dcf_v5_hybrid_stage1
-superblue3,DCF v4,dcf_v4,-,-5649.634560,-679.179938,3.195863E+09,1069.951,dcf_v5_hybrid_stage1
-superblue3,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-69.585555,-35.769992,4.571271E+08,527.974,dcf_v5_hybrid_stage1
-superblue3,DCF v5 hybrid,dcf_v5_hybrid_l020,0.20,-69.585555,-35.769992,4.571271E+08,499.586,dcf_v5_hybrid_stage1
-superblue3,DCF v5 hybrid,dcf_v5_hybrid_l030,0.30,-69.585555,-35.769992,4.571271E+08,497.609,dcf_v5_hybrid_stage1
+superblue3,DCF v3b,dcf_v3b,-,-154.419080,-42.022637,1.028749E+09,598.386,dcf_v5_hybrid_stage1_rerun
+superblue3,DCF v4,dcf_v4,-,-2137.769760,-241.284875,2.227109E+09,711.641,dcf_v5_hybrid_stage1_rerun
+superblue3,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-20.829390,-11.871647,4.628359E+08,655.028,dcf_v5_hybrid_stage1_rerun
+superblue3,DCF v5 hybrid,dcf_v5_hybrid_l020,0.20,-21.047935,-11.884948,4.626482E+08,640.096,dcf_v5_hybrid_stage1_rerun
+superblue3,DCF v5 hybrid,dcf_v5_hybrid_l030,0.30,-20.061879,-11.669104,4.626172E+08,640.373,dcf_v5_hybrid_stage1_rerun
 superblue18,Efficient-TDP,efficient_tdp_readme,-,-15.976826,-6.969738,2.338593E+08,270.556,README.research.md
-superblue18,DCF v3b,dcf_v3b,-,-17.436737,-6.949458,2.333044E+08,265.855,dcf_v5_hybrid_stage1
-superblue18,DCF v4,dcf_v4,-,-17.173689,-7.059581,2.332052E+08,264.040,dcf_v5_hybrid_stage1
-superblue18,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-92.205250,-20.069832,2.330831E+08,241.226,dcf_v5_hybrid_stage1
-superblue18,DCF v5 hybrid,dcf_v5_hybrid_l020,0.20,-92.205250,-20.069832,2.330831E+08,239.388,dcf_v5_hybrid_stage1
-superblue18,DCF v5 hybrid,dcf_v5_hybrid_l030,0.30,-92.205250,-20.069832,2.330831E+08,237.935,dcf_v5_hybrid_stage1
+superblue18,DCF v3b,dcf_v3b,-,-17.539333,-7.230634,2.333601E+08,260.365,dcf_v5_hybrid_stage1_rerun
+superblue18,DCF v4,dcf_v4,-,-17.294665,-6.898852,2.333973E+08,257.448,dcf_v5_hybrid_stage1_rerun
+superblue18,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-15.905527,-6.886202,2.346556E+08,294.325,dcf_v5_hybrid_stage1_rerun
+superblue18,DCF v5 hybrid,dcf_v5_hybrid_l020,0.20,-16.644815,-7.100224,2.340321E+08,295.922,dcf_v5_hybrid_stage1_rerun
+superblue18,DCF v5 hybrid,dcf_v5_hybrid_l030,0.30,-16.821959,-7.321099,2.357755E+08,264.010,dcf_v5_hybrid_stage1_rerun

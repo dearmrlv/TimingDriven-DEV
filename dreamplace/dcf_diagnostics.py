@@ -143,6 +143,9 @@ class DcfDiagnosticsManager(object):
         self.hybrid_debug_root_dir = getattr(
             params, "dcf_hybrid_debug_dump_dir", "results/hybrid_debug"
         )
+        self.hybrid_debug_summary_only = bool(
+            getattr(params, "dcf_hybrid_debug_summary_only", 0)
+        )
         self.hybrid_debug_root_dir = Path(self.hybrid_debug_root_dir)
         if not self.hybrid_debug_root_dir.is_absolute():
             self.hybrid_debug_root_dir = self.hybrid_debug_root_dir.resolve()
@@ -439,35 +442,61 @@ class DcfDiagnosticsManager(object):
             return None
 
         step_dir = self.hybrid_debug_step_dir(timing_step_id)
-        base_rows = self.build_top_pair_rows(pos, base_pair_dict, limit=10)
-        final_rows = self.build_top_pair_rows(pos, final_pair_dict, limit=10)
-        fieldnames = ["src_id", "src_name", "dst_id", "dst_name", "weight", "length"]
-        self.write_csv_rows(step_dir / "base_pairs.csv", fieldnames, base_rows)
-        self.write_csv_rows(step_dir / "final_pairs.csv", fieldnames, final_rows)
-
-        mhat_rows = []
         src_tensor = timing_diag.get("hybrid_mhat_src_ids")
         dst_tensor = timing_diag.get("hybrid_mhat_dst_ids")
         val_tensor = timing_diag.get("hybrid_mhat_values")
+        mhat_pair_count = int(timing_diag.get("hybrid_mhat_pair_count") or 0)
+        mhat_total_mass = _safe_float(timing_diag.get("hybrid_mhat_total_mass")) or 0.0
+        mhat_max_weight = _safe_float(timing_diag.get("hybrid_max_pair_mass")) or 0.0
+        mhat_min_nonzero_weight = 0.0
+        mhat_top_pair_src_id = None
+        mhat_top_pair_dst_id = None
+        mhat_top_pair_weight = 0.0
         if src_tensor is not None and dst_tensor is not None and val_tensor is not None:
             src_ids = src_tensor.detach().cpu().numpy()
             dst_ids = dst_tensor.detach().cpu().numpy()
             values = val_tensor.detach().cpu().numpy()
-            for src_id, dst_id, value in zip(src_ids, dst_ids, values):
-                mhat_rows.append(
-                    {
-                        "src_id": int(src_id),
-                        "src_name": self.pin_names[int(src_id)],
-                        "dst_id": int(dst_id),
-                        "dst_name": self.pin_names[int(dst_id)],
-                        "mhat": float(value),
-                    }
+            positive_values = values[values > 0]
+            if positive_values.size > 0:
+                mhat_min_nonzero_weight = float(positive_values.min())
+            if values.size > 0:
+                top_idx = int(np.argmax(values))
+                mhat_top_pair_src_id = int(src_ids[top_idx])
+                mhat_top_pair_dst_id = int(dst_ids[top_idx])
+                mhat_top_pair_weight = float(values[top_idx])
+
+            if not self.hybrid_debug_summary_only:
+                base_rows = self.build_top_pair_rows(pos, base_pair_dict, limit=10)
+                final_rows = self.build_top_pair_rows(pos, final_pair_dict, limit=10)
+                fieldnames = [
+                    "src_id",
+                    "src_name",
+                    "dst_id",
+                    "dst_name",
+                    "weight",
+                    "length",
+                ]
+                self.write_csv_rows(step_dir / "base_pairs.csv", fieldnames, base_rows)
+                self.write_csv_rows(
+                    step_dir / "final_pairs.csv", fieldnames, final_rows
                 )
-        self.write_csv_rows(
-            step_dir / "mhat_pairs.csv",
-            ["src_id", "src_name", "dst_id", "dst_name", "mhat"],
-            mhat_rows,
-        )
+
+                mhat_rows = []
+                for src_id, dst_id, value in zip(src_ids, dst_ids, values):
+                    mhat_rows.append(
+                        {
+                            "src_id": int(src_id),
+                            "src_name": self.pin_names[int(src_id)],
+                            "dst_id": int(dst_id),
+                            "dst_name": self.pin_names[int(dst_id)],
+                            "mhat": float(value),
+                        }
+                    )
+                self.write_csv_rows(
+                    step_dir / "mhat_pairs.csv",
+                    ["src_id", "src_name", "dst_id", "dst_name", "mhat"],
+                    mhat_rows,
+                )
 
         payload = {
             "timing_step_id": int(timing_step_id),
@@ -475,22 +504,13 @@ class DcfDiagnosticsManager(object):
             "hybrid_lambda": _safe_float(timing_diag.get("hybrid_lambda")),
             "raw_pin2pin": self.build_stage_summary_from_dict(pos, base_pair_dict),
             "mapped_mhat": {
-                "pair_count": int(timing_diag.get("hybrid_mhat_pair_count") or 0),
-                "total_weight_mass": _safe_float(
-                    timing_diag.get("hybrid_mhat_total_mass")
-                )
-                or 0.0,
-                "max_weight": _safe_float(timing_diag.get("hybrid_max_pair_mass"))
-                or 0.0,
-                "min_nonzero_weight": float(
-                    min(
-                        (row["mhat"] for row in mhat_rows if row["mhat"] > 0),
-                        default=0.0,
-                    )
-                ),
-                "top_pair_src_id": mhat_rows[0]["src_id"] if mhat_rows else None,
-                "top_pair_dst_id": mhat_rows[0]["dst_id"] if mhat_rows else None,
-                "top_pair_weight": mhat_rows[0]["mhat"] if mhat_rows else 0.0,
+                "pair_count": mhat_pair_count,
+                "total_weight_mass": mhat_total_mass,
+                "max_weight": mhat_max_weight,
+                "min_nonzero_weight": mhat_min_nonzero_weight,
+                "top_pair_src_id": mhat_top_pair_src_id,
+                "top_pair_dst_id": mhat_top_pair_dst_id,
+                "top_pair_weight": mhat_top_pair_weight,
             },
             "final_hybrid_dict": self.build_stage_summary_from_dict(
                 pos, final_pair_dict
