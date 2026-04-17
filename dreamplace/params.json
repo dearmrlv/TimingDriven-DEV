@@ -370,6 +370,10 @@
     "description": "DCF v5 hybrid augmentation weight",
     "default": 0.10
     },
+"dcf_hybrid_gate_fraction": {
+    "description": "top-q fraction of base Efficient-TDP pairs eligible for DCF hybrid augmentation",
+    "default": 1.0
+    },
 "dcf_hybrid_debug": {
     "description": "whether enable DCF hybrid engagement debug dumping",
     "default": 0

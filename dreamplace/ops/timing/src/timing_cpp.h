@@ -83,6 +83,7 @@ public:
     int dcf_v4_decay_start_step,
     int dcf_v4_decay_end_step,
     double dcf_hybrid_lambda,
+    double dcf_hybrid_gate_fraction,
     bool dcf_hybrid_debug,
     torch::Tensor dcf_bin_edges,
     bool enable_dcf_diagnostics,

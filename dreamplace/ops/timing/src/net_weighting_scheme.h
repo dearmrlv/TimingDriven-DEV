@@ -10,6 +10,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <ot/timer/timer.hpp>
 #include "utility/src/torch.h"
 #include "utility/src/utils.h"
@@ -73,6 +74,7 @@ enum class NetWeightingScheme {
       int dcf_version, T dcf_beta,                                 \
       T dcf_v4_base_beta, int dcf_v4_decay_start_step,             \
       int dcf_v4_decay_end_step, T dcf_hybrid_lambda,              \
+      T dcf_hybrid_gate_fraction,                                  \
       bool dcf_hybrid_debug,                                       \
       bool enable_dcf_diagnostics, int diagnostics_step_id,        \
       bool diagnostics_dump_step, bool dcf_diag_dump_state_stats,  \
@@ -1026,6 +1028,7 @@ struct NetWeighting<T, NetWeightingScheme::DCF_HYBRID> {
         }
 
         const T hybrid_lambda = std::clamp(dcf_hybrid_lambda, T(0), T(1));
+        const T gate_fraction = std::clamp(dcf_hybrid_gate_fraction, T(0), T(1));
         dreamplacePrint(kINFO, "apply dcf hybrid net-weighting scheme (lambda=%f)\n", static_cast<double>(hybrid_lambda));
         auto begT = std::chrono::steady_clock::now();
         const bool collect_hybrid_debug = dcf_hybrid_debug;
@@ -1210,7 +1213,42 @@ struct NetWeighting<T, NetWeightingScheme::DCF_HYBRID> {
         pin2pin_net_weight.attr("clear")();
         size_t exported_pairs = 0;
         size_t hybrid_reweighted_pairs = 0;
+        size_t gated_pairs = 0;
         T total_weight_mass = 0;
+        struct BasePairRow {
+            T base_weight;
+            int from_pin_id;
+            int to_pin_id;
+        };
+        std::vector<BasePairRow> base_pairs;
+        for (auto item : pin2pin_base_net_weight) {
+            auto key = item.first.cast<pybind11::tuple>();
+            base_pairs.push_back({
+                item.second.cast<T>(),
+                key[0].cast<int>(),
+                key[1].cast<int>(),
+            });
+        }
+        const size_t num_base_pairs = base_pairs.size();
+        std::unordered_set<std::pair<int, int>, pair_hash, pair_equal> gated_pair_keys;
+        if (gate_fraction > 0 && num_base_pairs > 0) {
+            std::sort(base_pairs.begin(), base_pairs.end(), [](const BasePairRow& lhs, const BasePairRow& rhs) {
+                if (lhs.base_weight != rhs.base_weight) {
+                    return lhs.base_weight > rhs.base_weight;
+                }
+                if (lhs.from_pin_id != rhs.from_pin_id) {
+                    return lhs.from_pin_id < rhs.from_pin_id;
+                }
+                return lhs.to_pin_id < rhs.to_pin_id;
+            });
+            gated_pairs = std::min(
+                num_base_pairs,
+                static_cast<size_t>(std::ceil(static_cast<double>(gate_fraction) * static_cast<double>(num_base_pairs))));
+            gated_pair_keys.reserve(gated_pairs);
+            for (size_t idx = 0; idx < gated_pairs; ++idx) {
+                gated_pair_keys.emplace(base_pairs[idx].from_pin_id, base_pairs[idx].to_pin_id);
+            }
+        }
         for (auto item : pin2pin_base_net_weight) {
             auto key = item.first.cast<pybind11::tuple>();
             const int from_pin_id = key[0].cast<int>();
@@ -1219,7 +1257,8 @@ struct NetWeighting<T, NetWeightingScheme::DCF_HYBRID> {
             const T base_weight = item.second.cast<T>();
             T m_hat = T(0);
             auto mass_itr = pair_mass.find(pair_key);
-            if (mass_itr != pair_mass.end() && max_pair_mass > 0) {
+            const bool in_gate = gate_fraction >= T(1) || gated_pair_keys.find(pair_key) != gated_pair_keys.end();
+            if (in_gate && mass_itr != pair_mass.end() && max_pair_mass > 0) {
                 m_hat = std::clamp(mass_itr->second / max_pair_mass, T(0), T(1));
                 ++hybrid_reweighted_pairs;
             }
@@ -1245,6 +1284,10 @@ struct NetWeighting<T, NetWeightingScheme::DCF_HYBRID> {
         diagnostics["arcs_with_nonzero_mass"] = pybind11::int_(arcs_with_mass);
         diagnostics["failing_endpoints_injected"] = pybind11::int_(failing_endpoints);
         diagnostics["hybrid_lambda"] = pybind11::float_(hybrid_lambda);
+        diagnostics["hybrid_gate_fraction"] = pybind11::float_(gate_fraction);
+        diagnostics["hybrid_gate_pair_count"] = pybind11::int_(gated_pairs);
+        diagnostics["hybrid_gate_pair_fraction_actual"] = pybind11::float_(
+            num_base_pairs == 0 ? T(0) : static_cast<T>(gated_pairs) / static_cast<T>(num_base_pairs));
         diagnostics["hybrid_max_pair_mass"] = pybind11::float_(max_pair_mass);
         diagnostics["hybrid_reweighted_pairs"] = pybind11::int_(hybrid_reweighted_pairs);
         diagnostics["hybrid_exported_pairs"] = pybind11::int_(exported_pairs);
