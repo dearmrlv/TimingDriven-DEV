@@ -1,0 +1,16 @@
+case,method,method_key,lambda,gate_fraction,tns,wns,hpwl,runtime,source
+superblue16,Efficient-TDP,efficient_tdp_readme,-,-,-22.604395,-7.841117,4.726394E+08,319.362,README.research.md
+superblue16,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-,-17.338564,-17.313271,4.639473E+08,525.121,dcf_v5_1_gated_stage1
+superblue16,DCF v5.1 gated hybrid,dcf_v5_1_gated_g010,0.10,0.10,-17.587287,-12.363670,4.638116E+08,481.075,dcf_v5_1_gated_stage1
+superblue16,DCF v5.1 gated hybrid,dcf_v5_1_gated_g025,0.10,0.25,-17.471917,-8.021292,4.638096E+08,462.813,dcf_v5_1_gated_stage1
+superblue16,DCF v5.1 gated hybrid,dcf_v5_1_gated_g050,0.10,0.50,-18.224451,-17.238732,4.640592E+08,460.028,dcf_v5_1_gated_stage1
+superblue3,Efficient-TDP,efficient_tdp_readme,-,-,-19.854089,-11.724317,4.628147E+08,554.147,README.research.md
+superblue3,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-,-21.075265,-11.855161,4.626795E+08,1010.867,dcf_v5_1_gated_stage1
+superblue3,DCF v5.1 gated hybrid,dcf_v5_1_gated_g010,0.10,0.10,-20.260102,-11.936544,4.626648E+08,635.101,dcf_v5_1_gated_stage1
+superblue3,DCF v5.1 gated hybrid,dcf_v5_1_gated_g025,0.10,0.25,-20.037340,-11.846602,4.626031E+08,621.511,dcf_v5_1_gated_stage1
+superblue3,DCF v5.1 gated hybrid,dcf_v5_1_gated_g050,0.10,0.50,-20.494532,-11.951053,4.626844E+08,629.027,dcf_v5_1_gated_stage1
+superblue18,Efficient-TDP,efficient_tdp_readme,-,-,-15.976826,-6.969738,2.338593E+08,270.556,README.research.md
+superblue18,DCF v5 hybrid,dcf_v5_hybrid_l010,0.10,-,-15.927817,-7.079268,2.337608E+08,436.093,dcf_v5_1_gated_stage1
+superblue18,DCF v5.1 gated hybrid,dcf_v5_1_gated_g010,0.10,0.10,-15.976050,-7.015169,2.338743E+08,302.443,dcf_v5_1_gated_stage1
+superblue18,DCF v5.1 gated hybrid,dcf_v5_1_gated_g025,0.10,0.25,-15.882309,-7.015556,2.338012E+08,303.019,dcf_v5_1_gated_stage1
+superblue18,DCF v5.1 gated hybrid,dcf_v5_1_gated_g050,0.10,0.50,-15.781382,-6.989462,2.338072E+08,302.970,dcf_v5_1_gated_stage1
