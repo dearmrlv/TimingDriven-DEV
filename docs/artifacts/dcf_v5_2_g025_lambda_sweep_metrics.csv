@@ -1,0 +1,19 @@
+case,method,method_key,lambda,gate_fraction,tns,wns,hpwl,runtime,source
+superblue16,Efficient-TDP,efficient_tdp_readme,-,-,-22.604395,-7.841117,4.726394E+08,319.362,README.research.md
+superblue16,DCF v5.1 gated hybrid,dcf_v5_1_gated_g025_l010,0.10,0.25,-22.887988,-8.216128,4.729425E+08,427.553,dcf_v5_2_g025_lambda_sweep
+superblue16,DCF v5.2 gated hybrid,dcf_v5_2_g025_l004,0.04,0.25,-22.155895,-7.803605,4.726714E+08,448.225,dcf_v5_2_g025_lambda_sweep
+superblue16,DCF v5.2 gated hybrid,dcf_v5_2_g025_l006,0.06,0.25,-22.994142,-8.272078,4.727700E+08,425.411,dcf_v5_2_g025_lambda_sweep
+superblue16,DCF v5.2 gated hybrid,dcf_v5_2_g025_l008,0.08,0.25,-16.824214,-7.772857,4.638200E+08,527.707,dcf_v5_2_g025_lambda_sweep
+superblue16,DCF v5.2 gated hybrid,dcf_v5_2_g025_l010,0.10,0.25,-17.299854,-11.265532,4.639593E+08,578.318,dcf_v5_2_g025_lambda_sweep
+superblue3,Efficient-TDP,efficient_tdp_readme,-,-,-19.854089,-11.724317,4.628147E+08,554.147,README.research.md
+superblue3,DCF v5.1 gated hybrid,dcf_v5_1_gated_g025_l010,0.10,0.25,-20.139885,-11.886676,4.627285E+08,818.826,dcf_v5_2_g025_lambda_sweep
+superblue3,DCF v5.2 gated hybrid,dcf_v5_2_g025_l004,0.04,0.25,-21.007280,-11.909313,4.627091E+08,774.882,dcf_v5_2_g025_lambda_sweep
+superblue3,DCF v5.2 gated hybrid,dcf_v5_2_g025_l006,0.06,0.25,-20.735180,-11.959057,4.627263E+08,786.444,dcf_v5_2_g025_lambda_sweep
+superblue3,DCF v5.2 gated hybrid,dcf_v5_2_g025_l008,0.08,0.25,-20.206612,-11.916282,4.626043E+08,798.046,dcf_v5_2_g025_lambda_sweep
+superblue3,DCF v5.2 gated hybrid,dcf_v5_2_g025_l010,0.10,0.25,-20.103431,-11.957526,4.626197E+08,726.830,dcf_v5_2_g025_lambda_sweep
+superblue18,Efficient-TDP,efficient_tdp_readme,-,-,-15.976826,-6.969738,2.338593E+08,270.556,README.research.md
+superblue18,DCF v5.1 gated hybrid,dcf_v5_1_gated_g025_l010,0.10,0.25,-16.030014,-7.006891,2.340009E+08,317.742,dcf_v5_2_g025_lambda_sweep
+superblue18,DCF v5.2 gated hybrid,dcf_v5_2_g025_l004,0.04,0.25,-16.005418,-6.876197,2.346284E+08,299.179,dcf_v5_2_g025_lambda_sweep
+superblue18,DCF v5.2 gated hybrid,dcf_v5_2_g025_l006,0.06,0.25,-15.940965,-6.937653,2.346688E+08,297.711,dcf_v5_2_g025_lambda_sweep
+superblue18,DCF v5.2 gated hybrid,dcf_v5_2_g025_l008,0.08,0.25,-15.765634,-6.915474,2.338369E+08,315.846,dcf_v5_2_g025_lambda_sweep
+superblue18,DCF v5.2 gated hybrid,dcf_v5_2_g025_l010,0.10,0.25,-16.100123,-6.956000,2.338929E+08,316.669,dcf_v5_2_g025_lambda_sweep
