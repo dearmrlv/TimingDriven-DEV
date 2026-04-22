@@ -1,0 +1,16 @@
+case,method,rerank_window_fraction,alpha,tns,wns,hpwl,runtime,source
+superblue16,Efficient-TDP,-,-,-22.604395,-7.841117,4.726394E+08,319.362,README.research.md
+superblue16,DCF v5.2 gated hybrid,-,0.20,-22.155895,-7.803605,4.726714E+08,448.225,dcf_v5_2_g025_lambda_sweep
+superblue16,DCF v6 local rerank,0.05,0.20,-17.375241,-10.539357,4.638693E+08,478.431,dcf_v6_local_rerank_stage1
+superblue16,DCF v6 local rerank,0.10,0.20,-17.914635,-7.874568,4.639684E+08,481.300,dcf_v6_local_rerank_stage1
+superblue16,DCF v6 local rerank,0.20,0.20,-24.018270,-7.983444,4.738115E+08,395.255,dcf_v6_local_rerank_stage1
+superblue3,Efficient-TDP,-,-,-19.854089,-11.724317,4.628147E+08,554.147,README.research.md
+superblue3,DCF v5.2 gated hybrid,-,0.20,-21.007280,-11.909313,4.627091E+08,774.882,dcf_v5_2_g025_lambda_sweep
+superblue3,DCF v6 local rerank,0.05,0.20,-20.807077,-11.981086,4.627228E+08,682.528,dcf_v6_local_rerank_stage1
+superblue3,DCF v6 local rerank,0.10,0.20,-20.553830,-11.854659,4.625727E+08,686.090,dcf_v6_local_rerank_stage1
+superblue3,DCF v6 local rerank,0.20,0.20,-21.592112,-11.951284,4.626012E+08,699.063,dcf_v6_local_rerank_stage1
+superblue18,Efficient-TDP,-,-,-15.976826,-6.969738,2.338593E+08,270.556,README.research.md
+superblue18,DCF v5.2 gated hybrid,-,0.20,-16.005418,-6.876197,2.346284E+08,299.179,dcf_v5_2_g025_lambda_sweep
+superblue18,DCF v6 local rerank,0.05,0.20,-16.689635,-7.226962,2.342712E+08,324.633,dcf_v6_local_rerank_stage1
+superblue18,DCF v6 local rerank,0.10,0.20,-16.825475,-6.941335,2.344257E+08,327.242,dcf_v6_local_rerank_stage1
+superblue18,DCF v6 local rerank,0.20,0.20,-16.108066,-7.008085,2.339016E+08,344.881,dcf_v6_local_rerank_stage1
