@@ -1,0 +1,4 @@
+case_name,first_timing_step_id,base_pin2pin_pair_count,gated_pair_count,gated_pair_fraction_actual,mapped_mhat_pair_count,final_hybrid_pair_count,exported_tensor_pair_count,final_hybrid_total_weight_mass,exported_tensor_total_weight_mass
+superblue16,1,101818,25455,0.25000491738319397,84056,101818,101818,1034597.9775218964,1034597.9375
+superblue3,1,44353,11089,0.2500168979167938,21086,44353,44353,454499.18842220306,454499.21875
+superblue18,1,25805,6452,0.250029057264328,20277,25805,25805,268644.63516807556,268644.625

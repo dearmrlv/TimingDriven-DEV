@@ -1,0 +1,10 @@
+case,method,run_tag,gate_fraction,lambda,tns,wns,hpwl,runtime,source
+superblue16,Efficient-TDP,baseline,-,-,-22.604395,-7.841117,4.726394E+08,319.362,README.research.md
+superblue16,DCF v5.2 gated hybrid,previous_best,0.25,0.04,-22.155895,-7.803605,4.726714E+08,448.225,dcf_v5_2_g025_lambda_sweep
+superblue16,DCF v5.3 gated hybrid,confirm_rerun,0.25,0.04,-23.879150,-8.048488,4.724991E+08,400.757,dcf_v5_3_g025_l004_confirm
+superblue3,Efficient-TDP,baseline,-,-,-19.854089,-11.724317,4.628147E+08,554.147,README.research.md
+superblue3,DCF v5.2 gated hybrid,previous_best,0.25,0.04,-21.007280,-11.909313,4.627091E+08,774.882,dcf_v5_2_g025_lambda_sweep
+superblue3,DCF v5.3 gated hybrid,confirm_rerun,0.25,0.04,-20.849530,-12.062613,4.626832E+08,691.870,dcf_v5_3_g025_l004_confirm
+superblue18,Efficient-TDP,baseline,-,-,-15.976826,-6.969738,2.338593E+08,270.556,README.research.md
+superblue18,DCF v5.2 gated hybrid,previous_best,0.25,0.04,-16.005418,-6.876197,2.346284E+08,299.179,dcf_v5_2_g025_lambda_sweep
+superblue18,DCF v5.3 gated hybrid,confirm_rerun,0.25,0.04,-15.923500,-7.004612,2.339012E+08,335.111,dcf_v5_3_g025_l004_confirm
