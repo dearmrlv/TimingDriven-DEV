@@ -694,6 +694,8 @@ class BasicPlace(nn.Module):
             dcf_v4_decay_end_step=params.dcf_v4_decay_end_step,
             dcf_hybrid_lambda=params.dcf_hybrid_lambda,
             dcf_hybrid_gate_fraction=params.dcf_hybrid_gate_fraction,
+            dcf_local_rerank_window_fraction=params.dcf_local_rerank_window_fraction,
+            dcf_local_rerank_alpha=params.dcf_local_rerank_alpha,
             dcf_hybrid_debug=params.dcf_hybrid_debug,
             dcf_bin_edges=params.dcf_bin_edges,
             enable_dcf_diagnostics=params.enable_dcf_diagnostics,

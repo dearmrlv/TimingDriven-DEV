@@ -512,6 +512,18 @@ class DcfDiagnosticsManager(object):
                 timing_diag.get("hybrid_gate_pair_fraction_actual")
             )
             or 0.0,
+            "local_rerank_window_fraction": _safe_float(
+                timing_diag.get("local_rerank_window_fraction")
+            ),
+            "local_rerank_window_pair_count": int(
+                timing_diag.get("local_rerank_window_pair_count") or 0
+            ),
+            "local_rerank_alpha": _safe_float(
+                timing_diag.get("local_rerank_alpha")
+            ),
+            "local_rerank_pairs_order_changed": int(
+                timing_diag.get("local_rerank_pairs_order_changed") or 0
+            ),
             "raw_pin2pin": self.build_stage_summary_from_dict(pos, base_pair_dict),
             "mapped_mhat": {
                 "pair_count": mhat_pair_count,

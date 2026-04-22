@@ -84,6 +84,8 @@ public:
     int dcf_v4_decay_end_step,
     double dcf_hybrid_lambda,
     double dcf_hybrid_gate_fraction,
+    double dcf_local_rerank_window_fraction,
+    double dcf_local_rerank_alpha,
     bool dcf_hybrid_debug,
     torch::Tensor dcf_bin_edges,
     bool enable_dcf_diagnostics,

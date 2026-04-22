@@ -537,7 +537,8 @@ class NonLinearPlace(BasicPlace.BasicPlace):
                                 )
 
                         if (
-                            params.net_weighting_scheme == "dcf_hybrid"
+                            params.net_weighting_scheme
+                            in {"dcf_hybrid", "dcf_local_rerank"}
                             and diagnostics_mgr.should_dump_hybrid_debug_step(
                                 timing_step_id
                             )

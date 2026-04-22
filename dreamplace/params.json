@@ -374,6 +374,14 @@
     "description": "top-q fraction of base Efficient-TDP pairs eligible for DCF hybrid augmentation",
     "default": 1.0
     },
+"dcf_local_rerank_window_fraction": {
+    "description": "top-q fraction of base Efficient-TDP pairs eligible for local rerank refinement",
+    "default": 0.05
+    },
+"dcf_local_rerank_alpha": {
+    "description": "DCF local rerank blend strength between base rank and DCF-M rank",
+    "default": 0.20
+    },
 "dcf_hybrid_debug": {
     "description": "whether enable DCF hybrid engagement debug dumping",
     "default": 0
