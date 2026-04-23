@@ -1,0 +1,16 @@
+case,method,expansion_size,tns,wns,hpwl,runtime,source
+superblue16,Efficient-TDP,-,-22.604395,-7.841117,4.726394E+08,319.362,README.research.md
+superblue16,DCF v5.2 gated hybrid,-,-22.155895,-7.803605,4.726714E+08,448.225,dcf_v5_2_g025_lambda_sweep
+superblue16,DCF v7 candidate expansion,0.01,-68.829540,-9.721957,4.900658E+08,505.608,dcf_v7_candidate_expansion_stage1
+superblue16,DCF v7 candidate expansion,0.02,-122.644110,-13.035047,4.880967E+08,533.919,dcf_v7_candidate_expansion_stage1
+superblue16,DCF v7 candidate expansion,0.05,-99.118360,-14.338023,4.939535E+08,508.776,dcf_v7_candidate_expansion_stage1
+superblue3,Efficient-TDP,-,-19.854089,-11.724317,4.628147E+08,554.147,README.research.md
+superblue3,DCF v5.2 gated hybrid,-,-21.007280,-11.909313,4.627091E+08,774.882,dcf_v5_2_g025_lambda_sweep
+superblue3,DCF v7 candidate expansion,0.01,-24.445023,-12.739604,4.680733E+08,652.111,dcf_v7_candidate_expansion_stage1
+superblue3,DCF v7 candidate expansion,0.02,-36.772040,-15.059357,4.677037E+08,676.105,dcf_v7_candidate_expansion_stage1
+superblue3,DCF v7 candidate expansion,0.05,-355.534400,-20.858781,4.674134E+08,758.283,dcf_v7_candidate_expansion_stage1
+superblue18,Efficient-TDP,-,-15.976826,-6.969738,2.338593E+08,270.556,README.research.md
+superblue18,DCF v5.2 gated hybrid,-,-16.005418,-6.876197,2.346284E+08,299.179,dcf_v5_2_g025_lambda_sweep
+superblue18,DCF v7 candidate expansion,0.01,-17.271440,-7.571909,2.342116E+08,339.582,dcf_v7_candidate_expansion_stage1
+superblue18,DCF v7 candidate expansion,0.02,-16.730291,-7.060589,2.342292E+08,322.350,dcf_v7_candidate_expansion_stage1
+superblue18,DCF v7 candidate expansion,0.05,-18.490461,-7.202573,2.344683E+08,325.615,dcf_v7_candidate_expansion_stage1
