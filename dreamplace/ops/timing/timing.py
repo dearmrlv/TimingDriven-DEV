@@ -149,6 +149,7 @@ class TimingOpt(nn.Module):
         dcf_hybrid_gate_fraction,
         dcf_local_rerank_window_fraction,
         dcf_local_rerank_alpha,
+        dcf_candidate_expansion_fraction,
         dcf_hybrid_debug,
         dcf_bin_edges,
         enable_dcf_diagnostics,
@@ -221,6 +222,7 @@ class TimingOpt(nn.Module):
         self.dcf_hybrid_gate_fraction = float(dcf_hybrid_gate_fraction)
         self.dcf_local_rerank_window_fraction = float(dcf_local_rerank_window_fraction)
         self.dcf_local_rerank_alpha = float(dcf_local_rerank_alpha)
+        self.dcf_candidate_expansion_fraction = float(dcf_candidate_expansion_fraction)
         self.dcf_hybrid_debug = bool(dcf_hybrid_debug)
         self.enable_dcf_diagnostics = bool(enable_dcf_diagnostics)
         self.dcf_diag_dump_first_timing_step_only = bool(
@@ -319,13 +321,15 @@ class TimingOpt(nn.Module):
             scm = 4
         elif self.net_weighting_scheme == "dcf_local_rerank":
             scm = 5
+        elif self.net_weighting_scheme == "dcf_candidate_expansion":
+            scm = 6
         else:
             logging.warning(
                 "unsupported net-weighting scheme %r" % (self.net_weighting_scheme)
             )
             scm = -1  # Unsupported scheme.
         if (
-            self.net_weighting_scheme in {"dcf", "dcf_hybrid", "dcf_local_rerank"}
+            self.net_weighting_scheme in {"dcf", "dcf_hybrid", "dcf_local_rerank", "dcf_candidate_expansion"}
             and not self.pin2pin_net_weighting
         ):
             logging.warning(
@@ -362,6 +366,7 @@ class TimingOpt(nn.Module):
             self.dcf_hybrid_gate_fraction,
             self.dcf_local_rerank_window_fraction,
             self.dcf_local_rerank_alpha,
+            self.dcf_candidate_expansion_fraction,
             self.dcf_hybrid_debug,
             torch.from_numpy(self.dcf_bin_edges),
             self.enable_dcf_diagnostics,

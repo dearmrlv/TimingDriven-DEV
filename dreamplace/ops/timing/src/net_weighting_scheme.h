@@ -38,7 +38,7 @@ DREAMPLACE_BEGIN_NAMESPACE
 // For different schemes, we implement different algorithms to update net
 // weights in each timing iteration.
 enum class NetWeightingScheme {
-  ADAMS, LILITH, PIN2PIN, DCF, DCF_HYBRID, DCF_LOCAL_RERANK
+  ADAMS, LILITH, PIN2PIN, DCF, DCF_HYBRID, DCF_LOCAL_RERANK, DCF_CANDIDATE_EXPANSION
 };
 
 ///
@@ -78,6 +78,7 @@ enum class NetWeightingScheme {
       T dcf_hybrid_gate_fraction,                                  \
       T dcf_local_rerank_window_fraction,                          \
       T dcf_local_rerank_alpha,                                    \
+      T dcf_candidate_expansion_fraction,                          \
       bool dcf_hybrid_debug,                                       \
       bool enable_dcf_diagnostics, int diagnostics_step_id,        \
       bool diagnostics_dump_step, bool dcf_diag_dump_state_stats,  \
@@ -1651,6 +1652,331 @@ struct NetWeighting<T, NetWeightingScheme::DCF_LOCAL_RERANK> {
         diagnostics["local_rerank_window_pair_count"] = pybind11::int_(rerank_window_pairs);
         diagnostics["local_rerank_alpha"] = pybind11::float_(rerank_alpha);
         diagnostics["local_rerank_pairs_order_changed"] = pybind11::int_(rerank_pairs_order_changed);
+        diagnostics["hybrid_mhat_pair_count"] = pybind11::int_(mapped_pairs);
+        diagnostics["hybrid_mhat_total_mass"] = pybind11::float_(total_mhat_mass);
+        diagnostics["hybrid_max_pair_mass"] = pybind11::float_(max_pair_mass);
+        if (collect_hybrid_debug) {
+            std::sort(top_mhat_pairs.begin(), top_mhat_pairs.end(), [](const auto& lhs, const auto& rhs) {
+                return std::get<0>(lhs) > std::get<0>(rhs);
+            });
+            if (top_mhat_pairs.size() > 10) {
+                top_mhat_pairs.resize(10);
+            }
+            std::vector<int> src_ids;
+            std::vector<int> dst_ids;
+            std::vector<T> mhat_values;
+            src_ids.reserve(top_mhat_pairs.size());
+            dst_ids.reserve(top_mhat_pairs.size());
+            mhat_values.reserve(top_mhat_pairs.size());
+            for (const auto& [mass, src, dst] : top_mhat_pairs) {
+                src_ids.push_back(src);
+                dst_ids.push_back(dst);
+                mhat_values.push_back(max_pair_mass > 0 ? mass / max_pair_mass : T(0));
+            }
+            diagnostics["hybrid_mhat_src_ids"] = dcf_tensor_from_int_vector(src_ids);
+            diagnostics["hybrid_mhat_dst_ids"] = dcf_tensor_from_int_vector(dst_ids);
+            diagnostics["hybrid_mhat_values"] = dcf_tensor_from_vector(mhat_values);
+        }
+        return diagnostics;
+    }
+};
+
+template <typename T>
+struct NetWeighting<T, NetWeightingScheme::DCF_CANDIDATE_EXPANSION> {
+    DEFINE_APPLY_SCHEME {
+        pybind11::dict diagnostics;
+        diagnostics["scheme_name"] = pybind11::str("dcf_candidate_expansion");
+        diagnostics["diagnostics_step_id"] = diagnostics_step_id;
+        if (!enable_dcf) {
+            dreamplacePrint(kWARN, "dcf_candidate_expansion scheme selected but enable_dcf is disabled; skip update\n");
+            return diagnostics;
+        }
+
+        const T expansion_fraction = std::clamp(dcf_candidate_expansion_fraction, T(0), T(1));
+        dreamplacePrint(kINFO, "apply dcf candidate expansion net-weighting scheme (fraction=%f)\n",
+            static_cast<double>(expansion_fraction));
+        auto begT = std::chrono::steady_clock::now();
+        const bool collect_hybrid_debug = dcf_hybrid_debug;
+
+        int num_unique_pairs = 0;
+        int num_all_pairs = 0;
+        update_pin2pin_weight_dict<T>(
+            timer,
+            pin_name2id_map,
+            pin2pin_base_net_weight,
+            pin2pin_max_weight,
+            pin2pin_min_weight,
+            pin2pin_accumulate_weight,
+            num_unique_pairs,
+            num_all_pairs);
+
+        const std::array<T, 3> edges = {
+            dcf_bin_edges[0], dcf_bin_edges[1], dcf_bin_edges[2]};
+        const T tau_A = std::max(dcf_tau_A, T(1e-3));
+        const T tau_S = std::max(dcf_tau_S, T(1e-3));
+
+        const auto endpoints = timer.report_negative_endpoints(ot::MAX);
+        const size_t num_pins = timer.num_pins();
+        const size_t num_arcs = timer.num_arcs();
+
+        std::vector<dcf_hist_type<T>> node_mass(2 * num_pins, make_zero_dcf_hist<T>());
+        std::vector<dcf_hist_type<T>> arc_hist(num_arcs, make_zero_dcf_hist<T>());
+        int failing_endpoints = 0;
+        for (const auto& [pin_name, rf, slack] : endpoints) {
+            const T deficit = std::max(T(0), static_cast<T>(-slack));
+            if (deficit <= 0) {
+                continue;
+            }
+            auto pin_itr = timer.pins().find(pin_name);
+            if (pin_itr == timer.pins().end()) {
+                continue;
+            }
+            const int bin = dcf_bin_index(deficit, edges);
+            auto& hist = node_mass[dcf_state_index<T>(pin_itr->second.idx(), rf, num_pins)];
+            hist[bin] += deficit;
+            ++failing_endpoints;
+        }
+
+        std::vector<int> remaining_fanout(num_pins, 0);
+        std::vector<const ot::Pin*> idx2pin(num_pins, nullptr);
+        std::vector<char> in_order(num_pins, 0);
+        std::deque<const ot::Pin*> ready;
+        for (const auto& [name, pin] : timer.pins()) {
+            remaining_fanout[pin.idx()] = static_cast<int>(pin.num_fanouts());
+            idx2pin[pin.idx()] = &pin;
+            if (pin.num_fanouts() == 0) {
+                ready.push_back(&pin);
+            }
+        }
+
+        std::vector<const ot::Pin*> reverse_order;
+        reverse_order.reserve(num_pins);
+        while (!ready.empty()) {
+            const ot::Pin* pin = ready.front();
+            ready.pop_front();
+            if (in_order[pin->idx()]) {
+                continue;
+            }
+            in_order[pin->idx()] = 1;
+            reverse_order.push_back(pin);
+            for (const ot::Arc* arc : pin->fanins()) {
+                const ot::Pin& pred = arc->from();
+                auto& fanout_left = remaining_fanout[pred.idx()];
+                if (fanout_left > 0 && --fanout_left == 0) {
+                    ready.push_back(&pred);
+                }
+            }
+        }
+
+        if (reverse_order.size() < num_pins) {
+            std::vector<const ot::Pin*> leftovers;
+            leftovers.reserve(num_pins - reverse_order.size());
+            for (size_t idx = 0; idx < num_pins; ++idx) {
+                if (!in_order[idx] && idx2pin[idx]) {
+                    leftovers.push_back(idx2pin[idx]);
+                }
+            }
+            std::sort(leftovers.begin(), leftovers.end(), [](const ot::Pin* lhs, const ot::Pin* rhs) {
+                return dcf_pin_max_arrival<T>(*lhs) > dcf_pin_max_arrival<T>(*rhs);
+            });
+            reverse_order.insert(reverse_order.end(), leftovers.begin(), leftovers.end());
+        }
+
+        for (const ot::Pin* pin : reverse_order) {
+            for (const auto rf : {ot::RISE, ot::FALL}) {
+                auto& q_v = node_mass[dcf_state_index<T>(pin->idx(), rf, num_pins)];
+                const T incoming_mass = dcf_hist_mass(q_v);
+                if (incoming_mass <= 0) {
+                    continue;
+                }
+                auto v_at = pin->at(ot::MAX, rf);
+                auto v_rat = pin->rat(ot::MAX, rf);
+                if (!v_at || !v_rat) {
+                    continue;
+                }
+
+                struct Candidate {
+                    const ot::Arc* arc;
+                    ot::Tran pred_rf;
+                    T score;
+                };
+                std::vector<Candidate> candidates;
+                T denom = 0;
+                for (const ot::Arc* arc : pin->fanins()) {
+                    const ot::Pin& pred = arc->from();
+                    for (const auto pred_rf : {ot::RISE, ot::FALL}) {
+                        auto pred_at = pred.at(ot::MAX, pred_rf);
+                        auto delay = arc->delay(ot::MAX, pred_rf, rf);
+                        if (!pred_at || !delay) {
+                            continue;
+                        }
+                        const T arrival_gap = static_cast<T>(*v_at) -
+                            (static_cast<T>(*pred_at) + static_cast<T>(*delay));
+                        const T local_margin = static_cast<T>(*v_rat) -
+                            (static_cast<T>(*pred_at) + static_cast<T>(*delay));
+                        const T score = dcf_safe_exp(-arrival_gap / tau_A) *
+                            dcf_safe_exp(-std::max(T(0), local_margin) / tau_S);
+                        if (!std::isfinite(score) || score <= 0) {
+                            continue;
+                        }
+                        candidates.push_back({arc, pred_rf, score});
+                        denom += score;
+                    }
+                }
+                if (denom <= 0 || candidates.empty()) {
+                    continue;
+                }
+
+                for (const auto& candidate : candidates) {
+                    const T prob = candidate.score / denom;
+                    const auto delta_q = dcf_scale_hist(q_v, prob);
+                    dcf_add_hist(arc_hist[candidate.arc->idx()], delta_q);
+                    dcf_add_hist(
+                        node_mass[dcf_state_index<T>(candidate.arc->from().idx(), candidate.pred_rf, num_pins)],
+                        delta_q);
+                }
+            }
+        }
+
+        std::unordered_map<std::pair<int, int>, T, pair_hash, pair_equal> pair_mass;
+        T max_pair_mass = T(0);
+        T total_mhat_mass = T(0);
+        size_t arcs_with_mass = 0;
+        size_t mapped_pairs = 0;
+        std::vector<std::tuple<T, int, int>> top_mhat_pairs;
+        if (collect_hybrid_debug) {
+            top_mhat_pairs.reserve(num_arcs);
+        }
+        for (const auto& arc : timer.arcs()) {
+            const auto& hist = arc_hist[arc.idx()];
+            const T mass = dcf_hist_mass(hist);
+            if (mass <= 0) {
+                continue;
+            }
+            ++arcs_with_mass;
+            if (!arc.is_net_arc()) {
+                continue;
+            }
+            auto from_itr = pin_name2id_map.find(arc.from().name());
+            auto to_itr = pin_name2id_map.find(arc.to().name());
+            if (from_itr == pin_name2id_map.end() || to_itr == pin_name2id_map.end()) {
+                continue;
+            }
+            pair_mass[{from_itr->second, to_itr->second}] = mass;
+            max_pair_mass = std::max(max_pair_mass, mass);
+            total_mhat_mass += mass;
+            ++mapped_pairs;
+            if (collect_hybrid_debug) {
+                top_mhat_pairs.emplace_back(mass, from_itr->second, to_itr->second);
+            }
+        }
+
+        struct BasePairRow {
+            T base_weight;
+            int from_pin_id;
+            int to_pin_id;
+        };
+        std::vector<BasePairRow> base_pairs;
+        std::vector<T> base_weights;
+        std::unordered_set<std::pair<int, int>, pair_hash, pair_equal> base_pair_keys;
+        T base_total_weight_mass = 0;
+        for (auto item : pin2pin_base_net_weight) {
+            auto key = item.first.cast<pybind11::tuple>();
+            const int from_pin_id = key[0].cast<int>();
+            const int to_pin_id = key[1].cast<int>();
+            const T base_weight = item.second.cast<T>();
+            base_pairs.push_back({base_weight, from_pin_id, to_pin_id});
+            base_weights.push_back(base_weight);
+            base_pair_keys.emplace(from_pin_id, to_pin_id);
+            base_total_weight_mass += base_weight;
+        }
+        const size_t num_base_pairs = base_pairs.size();
+
+        T supplementary_weight = static_cast<T>(pin2pin_min_weight);
+        if (!base_weights.empty()) {
+            std::sort(base_weights.begin(), base_weights.end());
+            const size_t percentile_index = std::min(
+                base_weights.size() - 1,
+                static_cast<size_t>(std::floor(0.10 * static_cast<double>(base_weights.size() - 1))));
+            supplementary_weight = base_weights[percentile_index];
+        }
+
+        struct SupplementaryPairRow {
+            T mhat;
+            int from_pin_id;
+            int to_pin_id;
+        };
+        std::vector<SupplementaryPairRow> supplementary_candidates;
+        supplementary_candidates.reserve(pair_mass.size());
+        for (const auto& [pair_key, mass] : pair_mass) {
+            if (base_pair_keys.find(pair_key) != base_pair_keys.end()) {
+                continue;
+            }
+            const T mhat = max_pair_mass > 0 ? std::clamp(mass / max_pair_mass, T(0), T(1)) : T(0);
+            if (mhat <= 0) {
+                continue;
+            }
+            supplementary_candidates.push_back({mhat, pair_key.first, pair_key.second});
+        }
+        std::sort(supplementary_candidates.begin(), supplementary_candidates.end(), [](const SupplementaryPairRow& lhs, const SupplementaryPairRow& rhs) {
+            if (lhs.mhat != rhs.mhat) {
+                return lhs.mhat > rhs.mhat;
+            }
+            if (lhs.from_pin_id != rhs.from_pin_id) {
+                return lhs.from_pin_id < rhs.from_pin_id;
+            }
+            return lhs.to_pin_id < rhs.to_pin_id;
+        });
+
+        const size_t target_supplementary_pairs =
+            (expansion_fraction > T(0) && num_base_pairs > 0)
+                ? std::min(
+                      supplementary_candidates.size(),
+                      static_cast<size_t>(std::ceil(static_cast<double>(expansion_fraction) * static_cast<double>(num_base_pairs))))
+                : 0;
+
+        pin2pin_net_weight.attr("clear")();
+        size_t exported_pairs = 0;
+        size_t supplementary_pairs_with_nonzero_weight = 0;
+        T supplementary_total_weight_mass = 0;
+        T final_total_weight_mass = 0;
+        for (const auto& pair : base_pairs) {
+            pin2pin_net_weight[pybind11::make_tuple(pair.from_pin_id, pair.to_pin_id)] = pair.base_weight;
+            ++exported_pairs;
+            final_total_weight_mass += pair.base_weight;
+        }
+        for (size_t idx = 0; idx < target_supplementary_pairs; ++idx) {
+            const auto& pair = supplementary_candidates[idx];
+            if (!std::isfinite(supplementary_weight) || supplementary_weight <= 0) {
+                continue;
+            }
+            pin2pin_net_weight[pybind11::make_tuple(pair.from_pin_id, pair.to_pin_id)] = supplementary_weight;
+            ++exported_pairs;
+            ++supplementary_pairs_with_nonzero_weight;
+            supplementary_total_weight_mass += supplementary_weight;
+            final_total_weight_mass += supplementary_weight;
+        }
+
+        auto endT = std::chrono::steady_clock::now();
+        dreamplacePrint(kINFO, "candidate expansion arcs with nonzero mass %zu\n", arcs_with_mass);
+        dreamplacePrint(kINFO, "candidate expansion exported pin pairs %zu\n", exported_pairs);
+        dreamplacePrint(kINFO, "candidate expansion supplementary pairs %zu\n", target_supplementary_pairs);
+        dreamplacePrint(kINFO, "candidate expansion supplementary weight mass %f\n", static_cast<double>(supplementary_total_weight_mass));
+        dreamplacePrint(kINFO, "candidate expansion total exported weight mass %f\n", static_cast<double>(final_total_weight_mass));
+        dreamplacePrint(kINFO, "finish dcf candidate expansion net-weighting (%f s)\n",
+            std::chrono::duration_cast<std::chrono::milliseconds>(endT - begT).count() * 0.001);
+
+        diagnostics["dcf_pass_runtime_sec"] =
+            std::chrono::duration_cast<std::chrono::milliseconds>(endT - begT).count() * 0.001;
+        diagnostics["arcs_with_nonzero_mass"] = pybind11::int_(arcs_with_mass);
+        diagnostics["failing_endpoints_injected"] = pybind11::int_(failing_endpoints);
+        diagnostics["candidate_expansion_fraction"] = pybind11::float_(expansion_fraction);
+        diagnostics["candidate_expansion_pair_count"] = pybind11::int_(target_supplementary_pairs);
+        diagnostics["candidate_expansion_pair_fraction_actual"] = pybind11::float_(
+            num_base_pairs == 0 ? T(0) : static_cast<T>(target_supplementary_pairs) / static_cast<T>(num_base_pairs));
+        diagnostics["candidate_expansion_pairs_with_nonzero_weight"] = pybind11::int_(supplementary_pairs_with_nonzero_weight);
+        diagnostics["candidate_expansion_base_total_weight_mass"] = pybind11::float_(base_total_weight_mass);
+        diagnostics["candidate_expansion_supplementary_total_weight_mass"] = pybind11::float_(supplementary_total_weight_mass);
         diagnostics["hybrid_mhat_pair_count"] = pybind11::int_(mapped_pairs);
         diagnostics["hybrid_mhat_total_mass"] = pybind11::float_(total_mhat_mass);
         diagnostics["hybrid_max_pair_mass"] = pybind11::float_(max_pair_mass);

@@ -86,6 +86,7 @@ public:
     double dcf_hybrid_gate_fraction,
     double dcf_local_rerank_window_fraction,
     double dcf_local_rerank_alpha,
+    double dcf_candidate_expansion_fraction,
     bool dcf_hybrid_debug,
     torch::Tensor dcf_bin_edges,
     bool enable_dcf_diagnostics,

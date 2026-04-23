@@ -696,6 +696,7 @@ class BasicPlace(nn.Module):
             dcf_hybrid_gate_fraction=params.dcf_hybrid_gate_fraction,
             dcf_local_rerank_window_fraction=params.dcf_local_rerank_window_fraction,
             dcf_local_rerank_alpha=params.dcf_local_rerank_alpha,
+            dcf_candidate_expansion_fraction=params.dcf_candidate_expansion_fraction,
             dcf_hybrid_debug=params.dcf_hybrid_debug,
             dcf_bin_edges=params.dcf_bin_edges,
             enable_dcf_diagnostics=params.enable_dcf_diagnostics,

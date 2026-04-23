@@ -397,6 +397,7 @@ pybind11::dict updateNetWeightCppLauncher(
     T dcf_hybrid_gate_fraction,
     T dcf_local_rerank_window_fraction,
     T dcf_local_rerank_alpha,
+    T dcf_candidate_expansion_fraction,
     bool dcf_hybrid_debug,
     bool enable_dcf_diagnostics,
     int diagnostics_step_id,
@@ -424,6 +425,7 @@ pybind11::dict updateNetWeightCppLauncher(
        dcf_hybrid_gate_fraction,                      \
        dcf_local_rerank_window_fraction,              \
        dcf_local_rerank_alpha,                        \
+       dcf_candidate_expansion_fraction,              \
        dcf_hybrid_debug,                              \
        enable_dcf_diagnostics, diagnostics_step_id,   \
        diagnostics_dump_step, dcf_diag_dump_state_stats, \
@@ -445,6 +447,8 @@ pybind11::dict updateNetWeightCppLauncher(
       return SELECT_SCHEME(DCF_HYBRID);
     case 5:
       return SELECT_SCHEME(DCF_LOCAL_RERANK);
+    case 6:
+      return SELECT_SCHEME(DCF_CANDIDATE_EXPANSION);
     default:
       // WARNING: unsupported net-weighting scheme. Do nothing.
       // Do not report a warning since it has been done in python.
@@ -482,6 +486,7 @@ pybind11::dict TimingCpp::update_net_weights(
     double dcf_hybrid_gate_fraction,
     double dcf_local_rerank_window_fraction,
     double dcf_local_rerank_alpha,
+    double dcf_candidate_expansion_fraction,
     bool dcf_hybrid_debug,
     torch::Tensor dcf_bin_edges,
     bool enable_dcf_diagnostics,
@@ -547,6 +552,7 @@ pybind11::dict TimingCpp::update_net_weights(
             static_cast<scalar_t>(dcf_hybrid_gate_fraction),
             static_cast<scalar_t>(dcf_local_rerank_window_fraction),
             static_cast<scalar_t>(dcf_local_rerank_alpha),
+            static_cast<scalar_t>(dcf_candidate_expansion_fraction),
             dcf_hybrid_debug,
             enable_dcf_diagnostics,
             diagnostics_step_id,

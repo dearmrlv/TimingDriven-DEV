@@ -524,6 +524,27 @@ class DcfDiagnosticsManager(object):
             "local_rerank_pairs_order_changed": int(
                 timing_diag.get("local_rerank_pairs_order_changed") or 0
             ),
+            "candidate_expansion_fraction": _safe_float(
+                timing_diag.get("candidate_expansion_fraction")
+            ),
+            "candidate_expansion_pair_count": int(
+                timing_diag.get("candidate_expansion_pair_count") or 0
+            ),
+            "candidate_expansion_pair_fraction_actual": _safe_float(
+                timing_diag.get("candidate_expansion_pair_fraction_actual")
+            )
+            or 0.0,
+            "candidate_expansion_pairs_with_nonzero_weight": int(
+                timing_diag.get("candidate_expansion_pairs_with_nonzero_weight") or 0
+            ),
+            "candidate_expansion_base_total_weight_mass": _safe_float(
+                timing_diag.get("candidate_expansion_base_total_weight_mass")
+            )
+            or 0.0,
+            "candidate_expansion_supplementary_total_weight_mass": _safe_float(
+                timing_diag.get("candidate_expansion_supplementary_total_weight_mass")
+            )
+            or 0.0,
             "raw_pin2pin": self.build_stage_summary_from_dict(pos, base_pair_dict),
             "mapped_mhat": {
                 "pair_count": mhat_pair_count,

@@ -382,6 +382,10 @@
     "description": "DCF local rerank blend strength between base rank and DCF-M rank",
     "default": 0.20
     },
+"dcf_candidate_expansion_fraction": {
+    "description": "fraction of additional DCF-proposed supplementary pairs relative to the base pair count",
+    "default": 0.01
+    },
 "dcf_hybrid_debug": {
     "description": "whether enable DCF hybrid engagement debug dumping",
     "default": 0
